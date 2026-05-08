@@ -18,14 +18,14 @@ class App:
         
         # Настройка сетки основного контейнера - фрейм устройств слева занимает меньшую ширину
         self.main_container.grid_rowconfigure(0, weight=1)
-        self.main_container.grid_columnconfigure(0, weight=2)  # Колонка фрейма устройств (меньшая)
-        self.main_container.grid_columnconfigure(1, weight=3)  # Колонка основного фрейма (шире)
+        self.main_container.grid_columnconfigure(0, weight=1)  # Колонка фрейма устройств (уже)
+        self.main_container.grid_columnconfigure(1, weight=4)  # Колонка основного фрейма (шире)
         
         # Создание фреймов
         self.create_devices_frame()  # Создание фрейма устройств (слева)
         self.create_main_frame()  # Создание основного фрейма (справа)
         
-        # Размещение фреймов - фрейм устройств слева, ��сновной фрейм справа
+        # Размещение фреймов - фрейм устройств слева, основной фрейм справа
         self.devices_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.main_frame.grid(row=0, column=1, sticky="nsew")
         
