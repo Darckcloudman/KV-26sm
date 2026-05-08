@@ -6,7 +6,8 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Двухфреймовое приложение")
-        self.root.geometry("1000x700")
+        self.root.geometry("1280x720")  # Установка размера окна 1280x720
+        self.root.minsize(1280, 720)  # Минимальный размер окна
         
         # Настройка весов сетки для правильного изменения размеров
         self.root.grid_rowconfigure(0, weight=1)
@@ -14,31 +15,32 @@ class App:
         
         # Создание основного контейнера
         self.main_container = ttk.Frame(root)
-        self.main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.main_container.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         
-        # Настройка сетки основного контейнера - фрейм устройств слева занимает меньшую ширину
+        # Настройка сетки основного контейнера
         self.main_container.grid_rowconfigure(0, weight=1)
-        self.main_container.grid_columnconfigure(0, weight=1)  # Колонка фрейма устройств (уже)
-        self.main_container.grid_columnconfigure(1, weight=4)  # Колонка основного фрейма (шире)
+        self.main_container.grid_columnconfigure(0, weight=0)  # Левый фрейм (фиксированная ширина)
+        self.main_container.grid_columnconfigure(1, weight=1)  # Правый фрейм (расширяемый)
         
         # Создание фреймов
         self.create_devices_frame()  # Создание фрейма устройств (слева)
         self.create_main_frame()  # Создание основного фрейма (справа)
         
         # Размещение фреймов - фрейм устройств слева, основной фрейм справа
-        self.devices_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-        self.main_frame.grid(row=0, column=1, sticky="nsew")
+        self.devices_frame.grid(row=0, column=0, sticky="nsw", padx=(0, 0), pady=0, width=260)  # Ширина 260px
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=(0, 0), pady=0)  # Оставшееся пространство
         
         # Заполнение списка устройств
         self.fill_device_list()
     
     def create_devices_frame(self):
-        # Фрейм для списка устройств (слева)
-        self.devices_frame = ttk.Frame(self.main_container)
+        # Фрейм для списка устройств (слева, ширина 260px)
+        self.devices_frame = ttk.Frame(self.main_container, width=260)
+        self.devices_frame.pack_propagate(False)  # Сохранять заданный размер
         
         # Создание рамки с заголовком для границы и названия
         devices_label_frame = ttk.LabelFrame(self.devices_frame, text="Список устройств (58)")
-        devices_label_frame.pack(fill="both", expand=True)
+        devices_label_frame.pack(fill="both", expand=True, padx=5, pady=5)
         
         # Настройка весов сетки для фрейма устройств
         devices_label_frame.grid_rowconfigure(0, weight=1)
@@ -58,7 +60,7 @@ class App:
         canvas.configure(yscrollcommand=scrollbar.set)
         
         # Размещение холста и полосы прокрутки по сетке
-        canvas.grid(row=0, column=0, sticky="nsew")
+        canvas.grid(row=0, column=0, sticky="nsew", padx=(2, 0))
         scrollbar.grid(row=0, column=1, sticky="ns")
         
         # Настройка весов сетки холста
@@ -67,10 +69,11 @@ class App:
         
         # Создание фрейма для размещения кнопок устройств
         self.devices_button_frame = ttk.Frame(self.scrollable_frame)
-        self.devices_button_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.devices_button_frame.pack(fill="both", expand=True, padx=2, pady=2)
         
         # Настройка сетки для кнопок устройств
         self.devices_button_frame.grid_columnconfigure(0, weight=1)
+
 
     def fill_device_list(self):
         # Добавление 58 устройств в список
@@ -78,7 +81,7 @@ class App:
             device_btn = ttk.Button(
                 self.devices_button_frame,
                 text=f"Устройство {i}",
-                width=15,
+                width=20,
                 command=lambda dev=i: self.select_device(dev)
             )
             device_btn.grid(row=i-1, column=0, pady=1, sticky="ew")
@@ -94,75 +97,71 @@ class App:
             widget.destroy()
         
         # Добавление контента, специфичного для выбранного устройства
-        ttk.Label(
-            self.main_content_frame, 
-            text=f"Главное окно - Детали устройства {device_number}",
-            font=("Helvetica", 14, "bold")
-        ).pack(pady=20)
+        header_frame = ttk.Frame(self.main_content_frame)
+        header_frame.pack(fill="x", pady=(10, 20))
         
         ttk.Label(
-            self.main_content_frame,
+            header_frame, 
+            text=f"Главное окно — Детали устройства {device_number}",
+            font=("Helvetica", 14, "bold")
+        ).pack()
+        
+        # Блок подробной информации (примерно 300px высоты)
+        info_frame = ttk.LabelFrame(self.main_content_frame, text="Подробная информация")
+        info_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        ttk.Label(
+            info_frame,
             text=f"Здесь отображается подробная информация об Устройстве {device_number}.\n\nЗдесь можно добавить графики, информацию о состоянии, элементы управления\nи другую специфичную для устройства функциональность.",
             justify="center"
-        ).pack(pady=10)
+        ).pack(pady=20, expand=True)
+        
+        # Блок "Состояние / Управление" (примерно 120px высоты)
+        controls_frame = ttk.LabelFrame(self.main_content_frame, text="Состояние / Управление")
+        controls_frame.pack(fill="x", padx=10, pady=(0, 10), height=120)
+        controls_frame.pack_propagate(False)  # Сохранять заданную высоту
         
         # Создание интерфейса с вкладками для разных типов информации
-        notebook = ttk.Notebook(self.main_content_frame)
-        notebook.pack(fill="both", expand=True, padx=20, pady=10)
+        notebook = ttk.Notebook(controls_frame)
+        notebook.pack(fill="both", expand=True, padx=5, pady=5)
         
         # Вкладка состояния
         status_tab = ttk.Frame(notebook)
         notebook.add(status_tab, text="Состояние")
         
         # Создание фрейма для индикаторов состояния
-        status_frame = ttk.LabelFrame(status_tab, text="Состояние устройства")
-        status_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        status_inner_frame = ttk.Frame(status_tab)
+        status_inner_frame.pack(fill="both", expand=True, padx=5, pady=5)
         
         # Добавление некоторых индикаторов состояния
-        ttk.Label(status_frame, text="Подключение:", font=("Helvetica", 10, "bold")).grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        connection_status = ttk.Label(status_frame, text="Подключено", foreground="green")
-        connection_status.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        ttk.Label(status_inner_frame, text="Подключение:", font=("Helvetica", 10, "bold")).grid(row=0, column=0, sticky="w", padx=5, pady=2)
+        connection_status = ttk.Label(status_inner_frame, text="Подключено", foreground="green")
+        connection_status.grid(row=0, column=1, sticky="w", padx=5, pady=2)
         
-        ttk.Label(status_frame, text="Сигнал:", font=("Helvetica", 10, "bold")).grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        signal_status = ttk.Label(status_frame, text="Сильный", foreground="green")
-        signal_status.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        ttk.Label(status_inner_frame, text="Сигнал:", font=("Helvetica", 10, "bold")).grid(row=1, column=0, sticky="w", padx=5, pady=2)
+        signal_status = ttk.Label(status_inner_frame, text="Сильный", foreground="green")
+        signal_status.grid(row=1, column=1, sticky="w", padx=5, pady=2)
         
-        ttk.Label(status_frame, text="Батарея:", font=("Helvetica", 10, "bold")).grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        battery_status = ttk.Label(status_frame, text="85%", foreground="green")
-        battery_status.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        ttk.Label(status_inner_frame, text="Батарея:", font=("Helvetica", 10, "bold")).grid(row=2, column=0, sticky="w", padx=5, pady=2)
+        battery_status = ttk.Label(status_inner_frame, text="85%", foreground="green")
+        battery_status.grid(row=2, column=1, sticky="w", padx=5, pady=2)
         
         # Вкладка управления
         controls_tab = ttk.Frame(notebook)
         notebook.add(controls_tab, text="Управление")
         
-        controls_frame = ttk.LabelFrame(controls_tab, text="Элементы управления устройством")
-        controls_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Добавление кнопок управления
-        btn_frame = ttk.Frame(controls_frame)
-        btn_frame.pack(pady=20)
+        btn_frame = ttk.Frame(controls_tab)
+        btn_frame.pack(pady=10)
         
         ttk.Button(btn_frame, text="Обновить", command=lambda: print("Нажата кнопка Обновить")).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Настроить", command=lambda: print("Нажата кнопка Настроить")).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Перезагрузить", command=lambda: print("Нажата кнопка Перезагрузить")).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Отключить", command=lambda: print("Нажата кнопка Отключить")).pack(side="left", padx=5)
-        
-        # Добавление индикатора выполнения для имитации операции
-        progress_frame = ttk.Frame(controls_tab)
-        progress_frame.pack(fill="x", padx=10, pady=10)
-        
-        ttk.Label(progress_frame, text="Прогресс операции:").pack(anchor="w")
-        progress_bar = ttk.Progressbar(progress_frame, mode="determinate", length=300)
-        progress_bar.pack(pady=5)
-        progress_bar.start(10)
-        
-        # При выборе устройства остановить анимацию индикатора выполнения
-        self.root.after(2000, lambda: progress_bar.stop())
 
     def create_main_frame(self):
         # Основной фрейм, занимающий большую часть пространства (справа)
-        self.main_frame = ttk.LabelFrame(self.main_container, text="Главное окно")
-        self.main_frame.grid(row=0, column=1, sticky="nsew")
+        self.main_frame = ttk.LabelFrame(self.main_container, text="")
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=(0, 0), pady=0)
         
         # Настройка весов сетки
         self.main_frame.grid_rowconfigure(0, weight=1)
@@ -170,10 +169,12 @@ class App:
         
         # Создание фрейма для основного содержимого
         self.main_content_frame = ttk.Frame(self.main_frame)
-        self.main_content_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.main_content_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         
         # Настройка весов сетки
-        self.main_content_frame.grid_rowconfigure(0, weight=1)
+        self.main_content_frame.grid_rowconfigure(0, weight=0)  # Заголовок
+        self.main_content_frame.grid_rowconfigure(1, weight=1)  # Блок подробной информации
+        self.main_content_frame.grid_rowconfigure(2, weight=0)  # Блок управления
         self.main_content_frame.grid_columnconfigure(0, weight=1)
         
         # Изначально отобразить приветственное сообщение
