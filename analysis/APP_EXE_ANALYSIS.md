@@ -1,0 +1,1 @@
+PS> New-Item -ItemType Directory -Path "D:\Сoding\pyton_pro\analysis\decompiled" -Force | Out-Null; python -m uncompyle6 -o "D:\Сoding\pyton_pro\analysis\decompiled" "D:\Сoding\pyton_src\App Analizer\app.exe_extracted\app.pyc" 2>&1 | Select-Object -First 50
