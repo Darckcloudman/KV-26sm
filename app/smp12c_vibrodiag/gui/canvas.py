@@ -1,146 +1,125 @@
-"""Компонент графика matplotlib для PyQt5"""
+﻿"""Графический компонент на QPainter — стабильная версия без matplotlib"""
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-from typing import Optional
+from typing import Optional, Callable
+
+from PyQt5.QtWidgets import QWidget, QSizePolicy
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPainter, QPen, QColor, QFont, QBrush
 
 
-class MplCanvas(FigureCanvasQTAgg):
-    """График matplotlib для интеграции в PyQt5"""
-    
-    def __init__(self, parent=None, width=8, height=4, dpi=100):
-        """
-        Инициализация канваса
-        
-        Args:
-            parent: родительский виджет
-            width: ширина графика в дюймах
-            height: высота графика в дюймах
-            dpi: разрешение
-        """
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.ax = self.fig.add_subplot(111)
-        super().__init__(self.fig)
-        
-        self.setParent(parent)
-        
-        # Настройки графика
-        self(fig).set_size_policy(1, 1)  # QSizePolicy.Expanding
-        self(fig).updateGeometry()
-        
-        # Обработчик клика
+class MplCanvas(QWidget):
+    """Виджет для отрисовки графиков вибрации на QPainter"""
+
+    def __init__(self, parent=None, width=10, height=5, dpi=100):
+        super().__init__(parent)
+        self.setMinimumSize(400, 250)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setStyleSheet("background-color: #000000;")
+
+        self.frequencies = np.array([])
+        self.amplitudes = np.array([])
+        self.zone = 'A'
+        self.rms = 0.0
         self._click_callback = None
-        self.mpl_connect('button_press_event', self._on_click)
-    
-    def _on_click(self, event):
-        """Обработка клика по графику"""
-        if event.inaxes == self.ax and self._click_callback:
-            x, y = event.xdata, event.ydata
+
+    def set_click_callback(self, callback):
+        self._click_callback = callback
+
+    def plot_spectrum(self, frequencies, amplitudes, zone, rms_value):
+        self.frequencies = np.asarray(frequencies)
+        self.amplitudes = np.asarray(amplitudes)
+        self.zone = zone
+        self.rms = rms_value
+        self.update()
+
+    def clear(self):
+        self.frequencies = np.array([])
+        self.amplitudes = np.array([])
+        self.update()
+
+    def mousePressEvent(self, event):
+        if self._click_callback and len(self.frequencies) > 0:
+            x, y = self._screen_to_data(event.x(), event.y())
             if x is not None and y is not None:
                 self._click_callback(x, y)
-    
-    def set_click_callback(self, callback):
-        """
-        Установка Callback для клика
-        
-        Args:
-            callback: функция callback(x, y)
-        """
-        self._click_callback = callback
-    
-    def plot_spectrum(self, frequencies: np.ndarray, amplitudes: np.ndarray, 
-                     zone: str, rms_value: float):
-        """
-        Построение спектра вибрации
-        
-        Args:
-            frequencies: массив частот (Гц)
-            amplitudes: массив амплитуд
-            zone: зона состояния (A/B/C/D)
-            rms_value: значение СКЗ
-        """
-        self.ax.clear()
-        
-        # Построение спектра
-        self.ax.plot(frequencies, amplitudes, 'b-', linewidth=1.5, label='Спектр')
-        
-        # Границы зон ISO 10816
-        zone_boundaries = [
-            (2.3, 'orange', 'A/B'),
-            (4.5, 'red', 'B/C'),
-            (7.8, 'darkred', 'C/D')
-        ]
-        
-        for threshold, color, label in zone_boundaries:
-            self.ax.axhline(y=threshold, color=color, linestyle='--', 
-                           linewidth=1, alpha=0.7, label=f'{label} ({threshold} мм/с)')
-        
-        # Подсветка текущей зоны
-        zone_colors = {'A': 'green', 'B': 'orange', 'C': 'red', 'D': 'darkred'}
-        zone_color = zone_colors.get(zone, 'gray')
-        
-        # Заполнение зоны
-        if zone == 'A':
-            self.ax.axhspan(0, 2.3, alpha=0.1, color='green')
-        elif zone == 'B':
-            self.ax.axhspan(0, 2.3, alpha=0.1, color='green')
-            self.ax.axhspan(2.3, 4.5, alpha=0.1, color='orange')
-        elif zone == 'C':
-            self.ax.axhspan(0, 2.3, alpha=0.1, color='green')
-            self.ax.axhspan(2.3, 4.5, alpha=0.1, color='orange')
-            self.ax.axhspan(4.5, 7.8, alpha=0.1, color='red')
-        else:
-            self.ax.axhspan(0, 2.3, alpha=0.1, color='green')
-            self.ax.axhspan(2.3, 4.5, alpha=0.1, color='orange')
-            self.ax.axhspan(4.5, 7.8, alpha=0.1, color='red')
-            self.ax.axhspan(7.8, max(8, max(amplitudes) * 1.1), alpha=0.1, color='darkred')
-        
-        # Настройки осей
-        self.ax.set_xlabel('Частота, Гц', fontsize=10)
-        self.ax.set_ylabel('Амплитуда, мм/с', fontsize=10)
-        self.ax.set_title(f'Спектр вибрации | Зона {zone} | СКЗ: {rms_value:.3f} мм/с', 
-                         fontsize=11)
-        
-        # Сетка
-        self.ax.grid(True, alpha=0.3)
-        
-        # Легенда
-        self.ax.legend(loc='upper right', fontsize=8)
-        
-        # Ограничение осей
-        max_freq = max(frequencies) if len(frequencies) > 0 else 100
-        max_amp = max(amplitudes) * 1.1 if len(amplitudes) > 0 else 10
-        self.ax.set_xlim(0, max_freq)
-        self.ax.set_ylim(0, max(max_amp, 10))
-        
-        self.draw()
-    
-    def plot_time_series(self, timestamps: np.ndarray, values: np.ndarray, 
-                        sensor_name: str = ''):
-        """
-        Построение временного ряда
-        
-        Args:
-            timestamps: массив временных меток
-            values: массив значений
-            sensor_name: имя датчика
-        """
-        self.ax.clear()
-        
-        self.ax.plot(timestamps, values, 'b-', linewidth=0.5)
-        
-        self.ax.set_xlabel('Время, с', fontsize=10)
-        self.ax.set_ylabel('Виброскорость, мм/с', fontsize=10)
-        self.ax.set_title(f'Временной ряд | {sensor_name}', fontsize=11)
-        self.ax.grid(True, alpha=0.3)
-        
-        self.draw()
-    
-    def clear(self):
-        """Очистка графика"""
-        self.ax.clear()
-        self.fig.text(0.5, 0.5, 'Загрузите данные для отображения',
-                     ha='center', va='center', fontsize=12, alpha=0.5)
-        self.draw()
+
+    def _screen_to_data(self, sx, sy):
+        w, h = self.width(), self.height()
+        margin = 60
+        plot_w = w - 2 * margin
+        plot_h = h - 2 * margin
+        if plot_w <= 0 or plot_h <= 0:
+            return None, None
+        max_f = float(self.frequencies.max()) if len(self.frequencies) else 1.0
+        max_a = float(self.amplitudes.max()) * 1.1 if len(self.amplitudes) else 10.0
+        x = (sx - margin) / plot_w * max_f
+        y = (h - margin - sy) / plot_h * max_a
+        return x, y
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.fillRect(self.rect(), QColor('#000000'))
+
+        if len(self.frequencies) == 0:
+            painter.setPen(QColor('#666666'))
+            painter.setFont(QFont('Consolas', 11))
+            painter.drawText(self.rect(), Qt.AlignCenter, 'Загрузите данные для анализа')
+            return
+
+        w, h = self.width(), self.height()
+        margin = 60
+        plot_w = w - 2 * margin
+        plot_h = h - 2 * margin
+        max_f = float(self.frequencies.max()) if len(self.frequencies) else 1.0
+        max_a = float(self.amplitudes.max()) * 1.1 if len(self.amplitudes) else 10.0
+
+        def to_x(f): return margin + (f / max_f) * plot_w
+        def to_y(a): return h - margin - (a / max_a) * plot_h
+
+        # Оси
+        painter.setPen(QPen(QColor('#333333'), 1))
+        painter.drawLine(margin, h - margin, w - margin, h - margin)
+        painter.drawLine(margin, margin, margin, h - margin)
+
+        # Подписи
+        painter.setPen(QColor('#a0a0a0'))
+        painter.setFont(QFont('Consolas', 9))
+        painter.drawText(5, h // 2, 'Ампл.')
+        painter.drawText(w // 2 - 40, h - 5, 'Частота, Гц')
+
+        # Границы зон
+        zone_levels = [2.3, 4.5, 7.8]
+        zone_colors = ['#555555', '#666666', '#777777']
+        zone_labels = ['A/B', 'B/C', 'C/D']
+        for level, color, label in zip(zone_levels, zone_colors, zone_labels):
+            y = to_y(level)
+            painter.setPen(QPen(QColor(color), 1, Qt.DashLine))
+            painter.drawLine(margin, y, w - margin, y)
+            painter.setPen(QColor('#888888'))
+            painter.setFont(QFont('Consolas', 8))
+            painter.drawText(w - margin + 5, y + 3, label)
+
+        # Спектр
+        painter.setPen(QPen(QColor('#ff69b4'), 2))
+        pts = [(to_x(f), to_y(a)) for f, a in zip(self.frequencies, self.amplitudes)]
+        for i in range(len(pts) - 1):
+            painter.drawLine(int(pts[i][0]), int(pts[i][1]), int(pts[i+1][0]), int(pts[i+1][1]))
+
+        # Заголовок
+        painter.setPen(QColor('#e0e0e0'))
+        painter.setFont(QFont('Consolas', 10, QFont.Bold))
+        painter.drawText(margin, 20, 'Спектр | Зона %s | СКЗ: %.3f мм/с' % (self.zone, self.rms))
+
+        # Метки осей
+        painter.setPen(QColor('#666666'))
+        painter.setFont(QFont('Consolas', 8))
+        for tick in np.linspace(0, max_f, 5):
+            x = to_x(tick)
+            painter.drawLine(int(x), h - margin, int(x), h - margin + 5)
+            painter.drawText(int(x) - 15, h - margin + 18, '%.0f' % tick)
+        for tick in np.linspace(0, max_a, 5):
+            y = to_y(tick)
+            painter.drawLine(margin - 5, int(y), margin, int(y))
+            painter.drawText(margin - 45, int(y) + 3, '%.1f' % tick)
