@@ -1,18 +1,12 @@
-# Зависимости для SMP12C VibroDiag Analyzer
+﻿# Зависимости для SMP12C VibroDiag Analyzer
+# Версия 2.0.0 - без matplotlib, на QPainter
 
 # Основные библиотеки для обработки данных
-numpy>=1.24.0,<2.0.0
-scipy>=1.10.0,<2.0.0
-pandas>=2.0.0,<3.0.0
-
-# Для работы с файлами
-python-dateutil>=2.8.0
+numpy>=1.24.0
+scipy>=1.10.0
 
 # Для GUI
 PyQt5>=5.15.0
 
-# Для визуализации
-matplotlib>=3.7.0
-
-# Для упаковки в .exe
-pyinstaller>=6.0.0
+# Для сборки в .exe (опционально)
+cx_Freeze>=8.0.0
