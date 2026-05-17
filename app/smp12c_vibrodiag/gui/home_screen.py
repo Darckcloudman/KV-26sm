@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Вкладка Home — дизайн как на скриншоте.
-Чёрный фон, белые кнопки, shema.png с индикаторами.
+shema.png с индикаторами.
 """
 
 import re
@@ -13,7 +12,7 @@ from PySide6.QtWidgets import (
     QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView,
     QFrame, QSizePolicy, QMessageBox
 )
-from PySide6.QtCore import Qt, QThread, Signal, QRect
+from PySide6.QtCore import Qt, QThread, Signal, QRect, QVariantAnimation, QEasingCurve, QAbstractAnimation
 from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette
 
 from ..parsers.rd2_parser import MultiSensorRD2Parser
@@ -30,16 +29,17 @@ SENSOR_DESCRIPTIONS = [
     "Подшипник генератора, осевое направление",
 ]
 
-# Координаты датчиков на shema.png (подобраны под изображение)
+# Координаты датчиков на shema.png — подогнаны вручную и зафиксированы.
+# Изменять только при замене изображения shema.png!
 SENSOR_POSITIONS = [
-    (0.08, 0.78),   # 1 - нижний левый
-    (0.28, 0.88),   # 2 - нижний центр-лево
-    (0.48, 0.75),   # 3 - нижний центр
-    (0.72, 0.68),   # 4 - правый нижний
-    (0.85, 0.52),   # 5 - правый средний
-    (0.30, 0.30),   # 6 - верхний левый
-    (0.50, 0.18),   # 7 - верхний центр
-    (0.82, 0.15),   # 8 - верхний правый (отдельный круг)
+    (0.102, 0.698),   # 1 - нижний левый
+    (0.472, 0.918),   # 2 - нижний центр-лево
+    (0.505, 0.647),   # 3 - нижний центр
+    (0.894, 0.87),    # 4 - правый нижний
+    (0.833, 0.62),    # 5 - правый средний
+    (0.182, 0.32),    # 6 - верхний левый
+    (0.047, 0.304),   # 7 - верхний центр
+    (0.881, 0.378),   # 8 - верхний правый (отдельный круг)
 ]
 
 
@@ -61,19 +61,53 @@ class ParseThread(QThread):
 
 
 class SensorIndicator(QWidget):
-    """Круглый индикатор датчика."""
+    """Круглый индикатор датчика с плавным миганием."""
     clicked = Signal(int)
 
     def __init__(self, sensor_id, parent=None):
         super().__init__(parent)
         self.sensor_id = sensor_id
-        self.status = 'none'
+        self.status = 'empty'
         self.selected = False
+        self._glow = 1.0
         self.setFixedSize(26, 26)
         self.setCursor(Qt.PointingHandCursor)
 
+        self._animation = QVariantAnimation(self)
+        self._animation.setStartValue(0.0)
+        self._animation.setEndValue(1.0)
+        self._animation.setDuration(1200)
+        self._animation.setEasingCurve(QEasingCurve.InOutSine)
+        self._animation.valueChanged.connect(self._on_glow_changed)
+        self._animation.finished.connect(self._on_animation_finished)
+
+    def _on_glow_changed(self, value):
+        self._glow = value
+        self.update()
+
+    def _on_animation_finished(self):
+        if self._animation.direction() == QAbstractAnimation.Forward:
+            self._animation.setDirection(QAbstractAnimation.Backward)
+        else:
+            self._animation.setDirection(QAbstractAnimation.Forward)
+        self._animation.start()
+
+    @staticmethod
+    def _lerp_color(c1, c2, t):
+        return QColor(
+            int(c1.red() + (c2.red() - c1.red()) * t),
+            int(c1.green() + (c2.green() - c1.green()) * t),
+            int(c1.blue() + (c2.blue() - c1.blue()) * t),
+        )
+
     def setStatus(self, status):
         self.status = status
+        if status in ('ok', 'partial'):
+            if self._animation.state() != QAbstractAnimation.Running:
+                self._animation.start()
+        else:
+            self._animation.stop()
+            self._glow = 1.0
         self.update()
 
     def setSelected(self, selected):
@@ -86,18 +120,32 @@ class SensorIndicator(QWidget):
         r = 11
         cx, cy = 13, 13
 
-        if self.status == 'ok':
-            border_color = QColor("#4CAF50")
+        if self.status == 'empty':
+            border_color = QColor("#000000")
+            fill_brush = Qt.NoBrush
+            text_color = QColor("#000000")
+        elif self.status == 'ok':
+            bright = QColor("#4CAF50")
+            dark = QColor("#1a4a1a")
+            border_color = self._lerp_color(dark, bright, self._glow)
+            fill_brush = Qt.NoBrush
+            text_color = QColor("#000000")
         elif self.status == 'partial':
-            border_color = QColor("#FFC107")
+            bright = QColor("#FFC107")
+            dark = QColor("#4a3a00")
+            border_color = self._lerp_color(dark, bright, self._glow)
+            fill_brush = Qt.NoBrush
+            text_color = QColor("#000000")
         else:
             border_color = QColor("#F44336")
+            fill_brush = QBrush(QColor("#FFFFFF"))
+            text_color = QColor("#FFFFFF")
 
-        painter.setBrush(QBrush(QColor("#FFFFFF")))
-        painter.setPen(QPen(border_color, 2))
+        painter.setBrush(fill_brush)
+        painter.setPen(QPen(border_color, 5))
         painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
 
-        painter.setPen(QPen(QColor("#000000")))
+        painter.setPen(QPen(text_color))
         font = QFont("Arial", 9, QFont.Bold)
         painter.setFont(font)
         text_rect = QRect(cx - r, cy - r, r * 2, r * 2)
@@ -206,7 +254,7 @@ class HomeScreen(QWidget):
         self.setPalette(palette)
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(30, 20, 30, 15)
+        main_layout.setContentsMargins(60, 20, 60, 15)
         main_layout.setSpacing(14)
 
         # Заголовок
@@ -248,7 +296,7 @@ class HomeScreen(QWidget):
         left_top.addWidget(self.dir_btn)
 
         self.path_label = QLabel(f"Путь к месту хранения архивов:\n{self.archive_dir}")
-        self.path_label.setStyleSheet("color: #777777; font-size: 10px; background: transparent;")
+        self.path_label.setStyleSheet("color: #ffffff; font-size: 10px; background: transparent;")
         self.path_label.setWordWrap(True)
         left_top.addWidget(self.path_label)
         left_top.addStretch()
@@ -259,11 +307,11 @@ class HomeScreen(QWidget):
 
         # Таблица + Схема
         middle_layout = QHBoxLayout()
-        middle_layout.setSpacing(20)
+        middle_layout.setSpacing(4)
 
         # Таблица
         table_frame = QFrame()
-        table_frame.setStyleSheet("QFrame { background-color: #1A1A1A; border: 1px solid #333333; border-radius: 4px; }")
+        table_frame.setStyleSheet("QFrame { background-color: #ff0000; border: 1px solid #333333; border-radius: 4px; }")
         table_layout = QVBoxLayout(table_frame)
         table_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -279,6 +327,7 @@ class HomeScreen(QWidget):
                 border: none;
                 font-size: 11px;
                 outline: none;
+                margin-left: 8px;
             }
             QHeaderView::section {
                 background-color: #2A2A2A;
@@ -296,12 +345,56 @@ class HomeScreen(QWidget):
                 background-color: #FFFFFF;
                 color: #000000;
             }
+            QScrollBar:vertical {
+                background: #1A1A1A;
+                width: 8px;
+                border-radius: 8px;
+            }
+            QScrollBar::handle:vertical {
+                background: #E0E0E0;
+                border-radius: 6px;
+                min-height: 40px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #FFFFFF;
+            }
+            QScrollBar::handle:vertical:pressed {
+                background: #B0B0B0;
+            }
+            QScrollBar::sub-line:vertical, QScrollBar::add-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: transparent;
+            }
+            QScrollBar:horizontal {
+                background: #1A1A1A;
+                height: 8px;
+                border-radius: 8px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #E0E0E0;
+                border-radius: 6px;
+                min-width: 40px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #FFFFFF;
+            }
+            QScrollBar::handle:horizontal:pressed {
+                background: #B0B0B0;
+            }
+            QScrollBar::sub-line:horizontal, QScrollBar::add-line:horizontal {
+                width: 0px;
+            }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: transparent;
+            }
         """)
         self.archive_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.archive_table.setSelectionMode(QTableWidget.SingleSelection)
         self.archive_table.itemSelectionChanged.connect(self._on_archive_selected)
         self.archive_table.setMinimumWidth(300)
-        self.archive_table.setMaximumWidth(360)
+        self.archive_table.setMaximumWidth(300)
         table_layout.addWidget(self.archive_table)
 
         middle_layout.addWidget(table_frame, 0)
@@ -315,7 +408,7 @@ class HomeScreen(QWidget):
 
         # Список статусов
         status_frame = QFrame()
-        status_frame.setStyleSheet("QFrame { background-color: #1A1A1A; border: 1px solid #333333; border-radius: 4px; }")
+        status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
         status_layout = QVBoxLayout(status_frame)
         status_layout.setContentsMargins(12, 8, 12, 8)
         status_layout.setSpacing(4)
@@ -485,7 +578,7 @@ class HomeScreen(QWidget):
         for sensor_id in range(1, 9):
             data = self.parser.get_sensor_data(sensor_id)
             if data is None:
-                status = 'none'
+                status = 'empty'
             else:
                 has_acc = data['acceleration'] is not None
                 has_vel = data['velocity'] is not None
@@ -507,9 +600,12 @@ class HomeScreen(QWidget):
             elif status == 'partial':
                 label.setText("[частично]")
                 label.setStyleSheet("color: #FFC107; font-size: 11px; font-weight: bold; background: transparent;")
-            else:
+            elif status == 'none':
                 label.setText("[нет данных]")
                 label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
+            else:
+                label.setText("")
+                label.setStyleSheet("color: #444444; font-size: 11px; font-weight: bold; background: transparent;")
 
     def _on_sensor_clicked(self, sensor_id):
         self.scheme.set_selected_sensor(sensor_id)

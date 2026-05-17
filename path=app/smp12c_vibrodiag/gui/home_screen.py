@@ -1,0 +1,1 @@
+        main_layout.setContentsMargins(10, 20, 30, 15)
