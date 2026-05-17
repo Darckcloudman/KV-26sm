@@ -1,6 +1,5 @@
-"""GUI компоненты приложения"""
+"""GUI компоненты приложения v1.2"""
 
 from .main_window import MainWindow
-from .canvas import MplCanvas
 
-__all__ = ['MainWindow', 'MplCanvas']
+__all__ = ['MainWindow']

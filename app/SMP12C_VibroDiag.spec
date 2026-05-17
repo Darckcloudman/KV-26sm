@@ -5,7 +5,7 @@ a = Analysis(
     ['smp12c_vibrodiag\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('test_data', 'test_data')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

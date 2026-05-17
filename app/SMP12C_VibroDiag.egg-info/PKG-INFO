@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: SMP12C_VibroDiag
+Version: 2.0.0
+Summary: Анализатор вибрационной диагностики ветротурбин SMP12C
+Author: NLP-Core-Team
+Dynamic: author
+Dynamic: summary
