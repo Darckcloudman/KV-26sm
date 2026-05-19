@@ -579,10 +579,15 @@ class HomeScreen(QWidget):
 
         middle_layout.addWidget(table_frame, 0)
 
-        # Схема
+        # Схема в контейнере со смещением (вверх 50px, влево 50px)
+        scheme_container = QWidget()
+        scheme_container_layout = QVBoxLayout(scheme_container)
+        scheme_container_layout.setContentsMargins(-50, -50, 50, 0)
+        scheme_container_layout.setSpacing(0)
         self.scheme = SensorScheme()
         self.scheme.sensor_clicked.connect(self._on_sensor_clicked)
-        middle_layout.addWidget(self.scheme, 1)
+        scheme_container_layout.addWidget(self.scheme)
+        middle_layout.addWidget(scheme_container, 1)
 
         main_layout.addLayout(middle_layout, 2)
 
@@ -615,9 +620,9 @@ class HomeScreen(QWidget):
 
             self.status_labels[sensor_id] = status_label
 
-        # Обертка для центрирования таблицы статусов (max 650px)
+        # Обертка для таблицы статусов — сдвинута вправо, под схему
         status_wrapper = QHBoxLayout()
-        status_wrapper.addStretch()
+        status_wrapper.setContentsMargins(250, 0, 0, 0)  # отступ слева ~250px (под схему)
         status_frame.setMaximumWidth(650)
         status_wrapper.addWidget(status_frame)
         status_wrapper.addStretch()
