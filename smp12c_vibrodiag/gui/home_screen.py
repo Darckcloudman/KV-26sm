@@ -626,7 +626,11 @@ class HomeScreen(QWidget):
         status_frame.setMaximumWidth(650)
         status_wrapper.addWidget(status_frame)
         status_wrapper.addStretch()
-        right_layout.addLayout(status_wrapper, 0, alignment=Qt.AlignTop)
+        
+        # Контейнер для выравнивания статусов по верху
+        status_container = QWidget()
+        status_container.setLayout(status_wrapper)
+        right_layout.addWidget(status_container, 0, Qt.AlignTop)
         right_layout.addStretch()  # всё лишнее пространство снизу
 
         middle_layout.addWidget(right_panel, 1)
