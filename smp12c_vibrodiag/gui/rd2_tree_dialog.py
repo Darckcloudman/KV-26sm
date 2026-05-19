@@ -145,7 +145,7 @@ class Rd2TreeDialog(QDialog):
 
         self.tree_view.clicked.connect(self._on_tree_clicked)
         self.tree_view.doubleClicked.connect(self._on_tree_double_clicked)
-        self.tree_view.selectionModel().selectionChanged.connect(self._update_selection_display)
+        # selectionModel подключается в _setup_model() после setModel()
 
     def _setup_model(self, initial_path):
         self.model = QFileSystemModel()
@@ -156,6 +156,8 @@ class Rd2TreeDialog(QDialog):
         self.model.setNameFilters(["*.rd2"])
         self.model.setNameFilterDisables(False)
         self.tree_view.setModel(self.model)
+        # Подключаем сигнал изменения выделения (после setModel!)
+        self.tree_view.selectionModel().selectionChanged.connect(self._update_selection_display)
 
         # Show Name, Size, Date Modified; hide Type
         self.tree_view.setColumnHidden(2, True)
