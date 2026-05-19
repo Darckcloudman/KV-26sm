@@ -27,7 +27,7 @@ class TimeSeriesChart(QWidget):
 
         # Настройка pyqtgraph для тёмной темы
         pg.setConfigOptions(antialias=True)
-        pg.setConfigOption('background', '#121212')
+        pg.setConfigOption('background', '#000000')
         pg.setConfigOption('foreground', '#FFFFFF')
 
         self.plot_widget = pg.PlotWidget()

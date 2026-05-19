@@ -31,6 +31,8 @@ class SpectrumChart(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         pg.setConfigOptions(antialias=True)
+        pg.setConfigOption('background', '#000000')
+        pg.setConfigOption('foreground', '#FFFFFF')
 
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setTitle(self.title, color="#FFFFFF", size="11px")

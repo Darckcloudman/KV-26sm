@@ -1,12 +1,15 @@
 ﻿# Зависимости для SMP12C VibroDiag Analyzer
-# Версия 2.0.0 - без matplotlib, на QPainter
+# Версия 1.3 - с PostgreSQL и асинхронным DAL
 
 # Основные библиотеки для обработки данных
-numpy>=1.24.0
-scipy>=1.10.0
+numpy>=1.26.0
+scipy>=1.11.0
 
-# Для GUI (PySide6 для совместимости с новой версией 1.2)
-PySide6>=6.5.0
+# Для GUI (PySide6 для совместимости с новой версией 1.3)
+PySide6>=6.6.0
+
+# Иконки для GUI (Material Design Icons, Font Awesome и др.)
+QtAwesome>=1.4.0
 
 # Графики для реального времени
 pyqtgraph>=0.13.3
@@ -16,3 +19,20 @@ cx_Freeze>=8.0.0
 
 # Конфигурация
 pyyaml>=6.0
+
+# === DAL v1.3 - PostgreSQL ===
+# SQLAlchemy 2.0 с поддержкой async
+sqlalchemy>=2.0.0
+
+# Асинхронный драйвер PostgreSQL
+asyncpg>=0.29.0
+
+# Миграции базы данных
+alembic>=1.12.0
+
+# Валидация и управление настройками
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Загрузка переменных окружения
+python-dotenv>=1.0.0

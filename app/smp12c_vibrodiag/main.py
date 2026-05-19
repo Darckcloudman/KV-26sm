@@ -1,4 +1,7 @@
-"""Точка входа в приложение SMP12C VibroDiag Analyzer v1.2"""
+"""Точка входа в приложение SMP12C VibroDiag Analyzer v1.3
+
+С поддержкой DAL (Data Access Layer) и PostgreSQL.
+"""
 
 import sys
 from PySide6.QtWidgets import QApplication
@@ -12,7 +15,7 @@ def main():
     # Создание приложения
     app = QApplication(sys.argv)
     app.setApplicationName('SMP12C VibroDiag Analyzer')
-    app.setApplicationVersion('1.2')
+    app.setApplicationVersion('1.3')
     app.setOrganizationName('SMP12C')
     
     # Применение стилей (закомментировано для отладки)

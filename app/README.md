@@ -1,8 +1,30 @@
-﻿# SMP12C VibroDiag Analyzer v1.2
+﻿# SMP12C VibroDiag Analyzer v1.3
 
 GUI-приложение для анализа вибрационной диагностики ветротурбин системы SMP12C (Siemens Gamesa Renewable Energy).
 
-## Что нового в v1.2
+## Что нового в v1.3
+
+### Data Access Layer (DAL)
+- Абстрактный репозиторий `IVibrationRepository` с двумя реализациями:
+  - `FileSystemRepository` — режим файловой системы (v1.2)
+  - `PostgresRepository` — режим PostgreSQL (новый)
+- Асинхронный доступ через `asyncpg` + SQLAlchemy 2.0
+- Кэширование спектров и результатов анализа
+- Утилита миграции `migrate_archives.py`
+
+### GUI улучшения (2025-01-25)
+- **Новый диалог выбора директории** (`directory_tree_dialog.py`):
+  - Древовидный просмотр файловой системы с навигацией
+  - Иконки QtAwesome (`mdi.*`) на панели инструментов
+  - История Back/Forward, цикличный Home
+  - Фиксированный размер `480×530 px`, компактные строки
+- **Стилизованные сообщения** (`styled_message_box.py`):
+  - Единый серый фон `#5A5A5A` для всех QMessageBox
+  - Иконки QtAwesome на заголовках окон
+  - Заменены все QMessageBox в проекте
+- **PowerShell скрипты** с автоматическим `ExecutionPolicy Bypass` fallback
+
+### Что нового в v1.2
 
 ### Экран Home (полная переработка)
 - **Интерактивная схема турбины** — `shema.png` с 8 кликабельными индикаторами датчиков
@@ -31,6 +53,12 @@ GUI-приложение для анализа вибрационной диаг
 - **Обновлена сборка** — cx_Freeze вместо PyInstaller (совместимость с Python 3.14)
 
 ## Быстрый старт
+
+> **PowerShell Execution Policy:** Если при запуске скриптов возникает ошибка `PSSecurityException`, используйте флаг `-ExecutionPolicy Bypass` (рекомендуется для ИИ-агентов и автоматизации):
+> ```powershell
+> powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
+> ```
+> Не изменяйте глобальные политики выполнения (`Set-ExecutionPolicy`) — это небезопасно.
 
 ### Установка
 
@@ -79,25 +107,33 @@ python setup.py build_exe
 ```
 app/
 ├── README.md                  # Этот файл
+├── CHANGELOG_v1.3.md          # История изменений
+├── COLORS.md                  # Справочник цветов UI
 ├── requirements.txt           # Зависимости Python
 ├── setup.py                   # Конфигурация cx_Freeze
 ├── PLAN.md                    # Подробный план разработки
 ├── PROJECT_SUMMARY.md         # Итоговый отчёт
-├── NEW_FEATURES.md            # Описание новых функций
 ├── smp12c_vibrodiag/
 │   ├── __init__.py
 │   ├── main.py                # Точка входа
+│   ├── app_settings.py        # Настройки приложения
 │   ├── gui/                   # GUI компоненты (PySide6)
-│   │   ├── canvas.py          # Графики спектра
 │   │   ├── main_window.py     # Главное окно
-│   │   ├── home_screen.py     # Экран Home (схема + индикаторы)
-│   │   ├── raw_data_screen.py # Экран сырых данных
-│   │   ├── upload_info_screen.py
-│   │   └── styles.py          # Тёмная тема
+│   │   ├── home_screen.py     # Экран Home
+│   │   ├── analysis_data_screen.py  # Экран анализа
+│   │   ├── directory_tree_dialog.py # Диалог выбора папки
+│   │   ├── styled_message_box.py    # Стилизованные QMessageBox
+│   │   ├── metric_card.py
+│   │   ├── charts/            # Графики
+│   │   └── ...
 │   ├── parsers/
 │   │   └── rd2_parser.py      # Парсер .rd2 файлов
-│   ├── analysis/
-│   │   └── vibration_analyzer.py
+│   ├── dal/                   # Data Access Layer (NEW)
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   └── alembic/
 │   └── utils/
 │       └── file_handler.py    # Работа с файлами
 └── test_data/                 # Тестовые данные
@@ -107,8 +143,10 @@ app/
 
 - **Python 3.14**
 - **PySide6** — графический интерфейс (Qt6)
+- **QtAwesome** — иконки Material Design (`mdi.*`)
 - **QPainter** — нативная отрисовка графиков
 - **numpy/scipy** — математические вычисления
+- **PostgreSQL + asyncpg** — хранение данных (опционально)
 - **cx_Freeze** — упаковка в EXE
 
 ## Лицензия

@@ -94,8 +94,8 @@ class MetricCard(QFrame):
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setStyleSheet("""
             MetricCard {
-                background-color: #2D2D2D;
-                border: 1px solid #444444;
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
                 border-radius: 8px;
             }
         """)

@@ -6,8 +6,9 @@
 import numpy as np
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QFrame, QMessageBox
+    QFrame
 )
+from .styled_message_box import show_critical
 from PySide6.QtCore import Qt
 
 from .metric_card import MetricCard
@@ -82,7 +83,7 @@ class AnalysisDataScreen(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        self.setStyleSheet("background-color: #1E1E1E;")
+        self.setStyleSheet("background-color: #000000;")
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(12)
         main_layout.setContentsMargins(12, 12, 12, 12)
@@ -212,7 +213,7 @@ class AnalysisDataScreen(QWidget):
             self._update_spectrums(data)
             self._update_zone_indicators(data)
         except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка при обработке файла:\n{str(e)}')
+            show_critical(self, 'Ошибка', f'Ошибка при обработке файла:\n{str(e)}')
 
     def _update_time_series(self, data):
         if data['acceleration'] is not None and data['acceleration_time'] is not None:

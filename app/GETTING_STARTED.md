@@ -34,20 +34,27 @@ app/
 
 ## 🚀 Быстрый запуск (3 шага)
 
+> **PowerShell Execution Policy:** При ошибках `PSSecurityException` запускайте скрипты с флагом `-ExecutionPolicy Bypass`:
+> ```powershell
+> powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
+> powershell.exe -ExecutionPolicy Bypass -File .\build_exe.ps1
+> ```
+> Это современная best practice — не требует глобального изменения политик безопасности.
+
 ### Шаг 1: Установка зависимостей
 
 ```powershell
 cd D:\Coding\pyton_pro\app
 
 # Автоматическая установка (рекомендуется)
-.\install_and_run.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
 ```
 
 Или вручную:
 
 ```powershell
 python -m venv venv
-.\venv\Scripts\Activate.ps1
+powershell.exe -ExecutionPolicy Bypass -Command ".\venv\Scripts\Activate.ps1"
 pip install -r requirements.txt
 ```
 
@@ -55,7 +62,7 @@ pip install -r requirements.txt
 
 ```powershell
 # Через скрипт (автоматически устанавливает и запускает)
-.\install_and_run.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
 
 # Или вручную
 python -m smp12c_vibrodiag.main
@@ -65,7 +72,7 @@ python -m smp12c_vibrodiag.main
 
 ```powershell
 # Автоматическая сборка
-.\build_exe.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\build_exe.ps1
 
 # Или вручную
 pyinstaller --onefile --windowed --name "SMP12C_VibroDiag" smp12c_vibrodiag/main.py

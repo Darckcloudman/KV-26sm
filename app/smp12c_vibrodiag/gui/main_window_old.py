@@ -8,10 +8,11 @@ from typing import List, Dict, Optional
 import numpy as np
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QFileDialog, QTabWidget, QMessageBox,
+    QPushButton, QFileDialog, QTabWidget,
     QLabel, QStatusBar, QMenuBar, QMenu, QAction,
     QScrollArea, QFrame
 )
+from .styled_message_box import show_warning, show_about
 from PyQt5.QtCore import Qt, QCoreApplication
 from PyQt5.QtGui import QFont, QPixmap
 
@@ -365,7 +366,7 @@ class MainWindow(QMainWindow):
     def _process_files(self):
         """Обработка всех загруженных файлов"""
         if not self._current_results:
-            QMessageBox.warning(self, 'Ошибка', 'Нет файлов для обработки')
+            show_warning(self, 'Ошибка', 'Нет файлов для обработки')
             return
         
         self.statusBar.showMessage('Обработка...')
@@ -380,7 +381,7 @@ class MainWindow(QMainWindow):
                 self._create_result_tab(filepath, result)
                 processed_count += 1
             except Exception as e:
-                QMessageBox.warning(
+                show_warning(
                     self, 
                     f'Ошибка обработки {Path(filepath).name}',
                     str(e)
@@ -582,14 +583,14 @@ class MainWindow(QMainWindow):
         current_index = self.tab_widget.currentIndex()
         
         if current_index <= 0:
-            QMessageBox.warning(self, 'Ошибка', 'Нет графика для сохранения')
+            show_warning(self, 'Ошибка', 'Нет графика для сохранения')
             return
         
         widget = self.tab_widget.widget(current_index)
         canvas = widget.findChild(MplCanvas)
         
         if not canvas:
-            QMessageBox.warning(self, 'Ошибка', 'График не найден')
+            show_warning(self, 'Ошибка', 'График не найден')
             return
         
         # Диалог сохранения
@@ -610,11 +611,11 @@ class MainWindow(QMainWindow):
             if success:
                 self.statusBar.showMessage(f'График сохранён: {file_path}')
             else:
-                QMessageBox.warning(self, 'Ошибка', 'Не удалось сохранить график')
+                show_warning(self, 'Ошибка', 'Не удалось сохранить график')
     
     def _show_about(self):
         """О программе"""
-        QMessageBox.about(
+        show_about(
             self,
             'О программе',
             'SMP12C VibroDiag Analyzer v1.0.0\n\n'

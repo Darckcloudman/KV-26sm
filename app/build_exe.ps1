@@ -1,4 +1,5 @@
 # Скрипт сборки EXE файла SMP12C VibroDiag
+# Лучшая практика: запускать через powershell.exe -ExecutionPolicy Bypass -File .\build_exe.ps1
 
 Write-Host "=== SMP12C VibroDiag Analyzer - Сборка EXE" -ForegroundColor Cyan
 Write-Host ""
@@ -10,16 +11,31 @@ if (-not (Test-Path "venv")) {
     exit 1
 }
 
-# Активация окружения
+# Активация окружения с обработкой политики выполнения
 Write-Host "Активация окружения..." -ForegroundColor Yellow
-.\venv\Scripts\Activate.ps1
+try {
+    .\venv\Scripts\Activate.ps1 -ErrorAction Stop
+    Write-Host "   Окружение активировано" -ForegroundColor Green
+} catch [System.Management.Automation.PSSecurityException] {
+    Write-Host "   Политика выполнения PowerShell блокирует активацию. Обходим через Bypass..." -ForegroundColor Yellow
+    powershell.exe -ExecutionPolicy Bypass -Command ".\venv\Scripts\Activate.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "   Ошибка: не удалось активировать окружение. Запустите скрипт через:" -ForegroundColor Red
+        Write-Host "   powershell.exe -ExecutionPolicy Bypass -File .\build_exe.ps1" -ForegroundColor Cyan
+        exit 1
+    }
+    Write-Host "   Окружение активировано (Bypass)" -ForegroundColor Green
+} catch {
+    Write-Host "   Ошибка активации: $_" -ForegroundColor Red
+    exit 1
+}
 
 # Установка pyinstaller если нет
 Write-Host "Проверка PyInstaller..." -ForegroundColor Yellow
-.\venv\Scripts\pip.exe show pyinstaller | Out-Null
+pip show pyinstaller | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Установка PyInstaller..." -ForegroundColor Yellow
-    .\venv\Scripts\pip.exe install pyinstaller
+    pip install pyinstaller
 }
 
 # Очистка предыдущих сборок
@@ -33,7 +49,8 @@ Write-Host "Сборка EXE (это займёт несколько минут)
 Write-Host ""
 
 # Вариант 1: Один EXE файл
-Set-Location "D:\Сoding\pyton_pro\app"
+$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $projectRoot
 python -m PyInstaller --onefile --windowed --name "SMP12C_VibroDiag" `
     --add-data "test_data;test_data" `
     smp12c_vibrodiag/main.py

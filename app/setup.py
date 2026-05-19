@@ -1,4 +1,4 @@
-﻿"""Setup для сборки SMP12C VibroDiag Analyzer v1.2 через cx_Freeze"""
+﻿"""Setup для сборки SMP12C VibroDiag Analyzer v1.3 через cx_Freeze"""
 
 from cx_Freeze import setup, Executable
 import sys
@@ -10,8 +10,9 @@ build_exe_options = {
         "PySide6",
         "pyqtgraph",
         "encodings",
+        "qtawesome",
     ],
-    "includes": ["numpy", "scipy", "PySide6", "pyqtgraph"],
+    "includes": ["numpy", "scipy", "PySide6", "pyqtgraph", "qtawesome"],
     "include_files": [
         ("smp12c_vibrodiag/gui/styles.py", "smp12c_vibrodiag/gui/styles.py"),
     ],
@@ -46,20 +47,11 @@ executables = [
 ]
 
 setup(
-    name="SMP12C VibroDiag Analyzer",
-    version="1.2",
-    description="Анализатор вибрационной диагностики ветротурбин SMP12C",
-    author="A.Telezhenko",
-    options={"build_exe": build_exe_options},
-    executables=executables
-)
-]
-
-setup(
     name="SMP12C_VibroDiag",
-    version="2.0.0",
+    version="1.3.0",
     description="Анализатор вибрационной диагностики ветротурбин SMP12C",
     author="NLP-Core-Team",
     options={"build_exe": build_exe_options},
     executables=executables
 )
+

@@ -20,6 +20,8 @@ cd D:\Сoding\pyton_pro\app
 python -m smp12c_vibrodiag.main
 ```
 
+> **PowerShell:** При ошибке `PSSecurityException` используйте `powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1`
+
 Или запустите скомпилированный `SMP12C_VibroDiag.exe`.
 
 ### Шаг 2: Загрузка тестовых данных
