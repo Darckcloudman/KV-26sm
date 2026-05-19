@@ -321,7 +321,7 @@ class SensorScheme(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(500, 340)
+        self.setMinimumSize(650, 442)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setStyleSheet("background-color: #000000; border: none;")
 
@@ -585,9 +585,8 @@ class HomeScreen(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(8)
 
-        # Схема — по центру, прижата к верху
+        # Схема — прижата влево (ближе к таблице), по верху
         scheme_wrapper = QHBoxLayout()
-        scheme_wrapper.addStretch()
         self.scheme = SensorScheme()
         self.scheme.sensor_clicked.connect(self._on_sensor_clicked)
         scheme_wrapper.addWidget(self.scheme, alignment=Qt.AlignTop)
