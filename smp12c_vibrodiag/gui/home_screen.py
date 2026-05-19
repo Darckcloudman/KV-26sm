@@ -29,7 +29,7 @@ from pathlib import Path
 from datetime import datetime
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView,
     QFrame, QSizePolicy, QProgressBar, QAbstractItemView, QTreeView,
     QDialog
@@ -580,34 +580,34 @@ class HomeScreen(QWidget):
 
         main_layout.addLayout(middle_layout, 2)
 
-        # Список статусов
+        # Список статусов (табличный вид — 3 колонки)
         status_frame = QFrame()
         status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
-        status_layout = QVBoxLayout(status_frame)
+        status_layout = QGridLayout(status_frame)
         status_layout.setContentsMargins(12, 8, 12, 8)
-        status_layout.setSpacing(4)
+        status_layout.setHorizontalSpacing(12)
+        status_layout.setVerticalSpacing(4)
+        status_layout.setColumnStretch(1, 1)   # Описание растягивается
+        status_layout.setColumnStretch(2, 0)   # Статус — фиксированная ширина
 
         self.status_labels = {}
         for i, desc in enumerate(SENSOR_DESCRIPTIONS):
             sensor_id = i + 1
-            row = QHBoxLayout()
-            row.setSpacing(12)
 
             num_label = QLabel(f"{sensor_id}.")
             num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
-            row.addWidget(num_label)
+            status_layout.addWidget(num_label, i, 0, alignment=Qt.AlignTop)
 
             desc_label = QLabel(desc)
             desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
-            row.addWidget(desc_label)
+            status_layout.addWidget(desc_label, i, 1, alignment=Qt.AlignTop)
 
             status_label = QLabel("[нет данных]")
             status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
-            row.addWidget(status_label)
-            row.addStretch()
+            status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignTop)
 
             self.status_labels[sensor_id] = status_label
-            status_layout.addLayout(row)
 
         main_layout.addWidget(status_frame, 0)
 
