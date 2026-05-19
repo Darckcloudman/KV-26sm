@@ -497,7 +497,7 @@ class HomeScreen(QWidget):
         self.archive_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.archive_table.setSelectionMode(QTableWidget.SingleSelection)
         self.archive_table.setMinimumWidth(300)
-        self.archive_table.setMaximumWidth(300)
+        self.archive_table.setMaximumWidth(600)
         self.archive_table.setStyleSheet("""
             QTableWidget {
                 background-color: #1A1A1A;
@@ -591,7 +591,7 @@ class HomeScreen(QWidget):
         for i, desc in enumerate(SENSOR_DESCRIPTIONS):
             sensor_id = i + 1
             row = QHBoxLayout()
-            row.setSpacing(8)
+            row.setSpacing(12)
 
             num_label = QLabel(f"{sensor_id}.")
             num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
@@ -599,11 +599,12 @@ class HomeScreen(QWidget):
 
             desc_label = QLabel(desc)
             desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
-            row.addWidget(desc_label, 1)
+            row.addWidget(desc_label)
 
             status_label = QLabel("[нет данных]")
             status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
             row.addWidget(status_label)
+            row.addStretch()
 
             self.status_labels[sensor_id] = status_label
             status_layout.addLayout(row)
