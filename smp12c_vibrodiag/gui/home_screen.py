@@ -593,9 +593,8 @@ class HomeScreen(QWidget):
         scheme_wrapper.addStretch()
         right_layout.addLayout(scheme_wrapper, 2)
 
-        # Список статусов — по центру
+        # Список статусов — прижаты влево (ближе к таблице) и к верху
         status_wrapper = QHBoxLayout()
-        status_wrapper.addStretch()
         status_frame = QFrame()
         status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
         status_layout = QGridLayout(status_frame)
@@ -627,7 +626,8 @@ class HomeScreen(QWidget):
         status_frame.setMaximumWidth(650)
         status_wrapper.addWidget(status_frame)
         status_wrapper.addStretch()
-        right_layout.addLayout(status_wrapper, 0)
+        right_layout.addLayout(status_wrapper, 0, alignment=Qt.AlignTop)
+        right_layout.addStretch()  # всё лишнее пространство снизу
 
         middle_layout.addWidget(right_panel, 1)
         main_layout.addLayout(middle_layout, 2)
