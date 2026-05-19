@@ -609,7 +609,13 @@ class HomeScreen(QWidget):
 
             self.status_labels[sensor_id] = status_label
 
-        main_layout.addWidget(status_frame, 0)
+        # Обертка для центрирования таблицы статусов (max 650px)
+        status_wrapper = QHBoxLayout()
+        status_wrapper.addStretch()
+        status_frame.setMaximumWidth(650)
+        status_wrapper.addWidget(status_frame)
+        status_wrapper.addStretch()
+        main_layout.addLayout(status_wrapper, 0)
 
         # Кнопка анализа
         self.analyze_btn = QPushButton("Проанализировать")

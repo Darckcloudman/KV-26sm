@@ -19,7 +19,8 @@ def _apply_style(msg: QMessageBox):
         QMessageBox {
             background-color: #5A5A5A;
         }
-        QLabel {
+        QMessageBox QLabel {
+            background-color: transparent;
             color: #FFFFFF;
             font-size: 13px;
             padding: 8px;
