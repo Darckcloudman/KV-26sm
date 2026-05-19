@@ -579,6 +579,12 @@ class HomeScreen(QWidget):
 
         middle_layout.addWidget(table_frame, 0)
 
+        # Правая панель: схема сверху + статусы снизу
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(8)
+
         # Схема в контейнере со смещением (вверх 50px, влево 50px)
         scheme_container = QWidget()
         scheme_container_layout = QVBoxLayout(scheme_container)
@@ -587,8 +593,41 @@ class HomeScreen(QWidget):
         self.scheme = SensorScheme()
         self.scheme.sensor_clicked.connect(self._on_sensor_clicked)
         scheme_container_layout.addWidget(self.scheme)
-        middle_layout.addWidget(scheme_container, 1)
+        right_layout.addWidget(scheme_container, 2)
 
+        # Список статусов (табличный вид — 3 колонки)
+        status_frame = QFrame()
+        status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
+        status_layout = QGridLayout(status_frame)
+        status_layout.setContentsMargins(30, 0, 0, 0)  # сдвиг вправо на 30px от таблицы архивов
+        status_layout.setHorizontalSpacing(8)
+        status_layout.setVerticalSpacing(4)
+        status_layout.setColumnStretch(1, 1)   # Описание растягивается
+        status_layout.setColumnStretch(2, 0)   # Статус — фиксированная ширина
+
+        self.status_labels = {}
+        for i, desc in enumerate(SENSOR_DESCRIPTIONS):
+            sensor_id = i + 1
+
+            num_label = QLabel(f"{sensor_id}.")
+            num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
+            status_layout.addWidget(num_label, i, 0, alignment=Qt.AlignTop)
+
+            desc_label = QLabel(desc)
+            desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
+            status_layout.addWidget(desc_label, i, 1, alignment=Qt.AlignTop)
+
+            status_label = QLabel("[нет данных]")
+            status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
+            status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignTop)
+
+            self.status_labels[sensor_id] = status_label
+
+        status_frame.setMaximumWidth(650)
+        right_layout.addWidget(status_frame, 0)
+
+        middle_layout.addWidget(right_panel, 1)
         main_layout.addLayout(middle_layout, 2)
 
         # Список статусов (табличный вид — 3 колонки)
@@ -619,14 +658,6 @@ class HomeScreen(QWidget):
             status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignTop)
 
             self.status_labels[sensor_id] = status_label
-
-        # Обертка для таблицы статусов — сдвинута вправо, под схему
-        status_wrapper = QHBoxLayout()
-        status_wrapper.setContentsMargins(250, 0, 0, 0)  # отступ слева ~250px (под схему)
-        status_frame.setMaximumWidth(650)
-        status_wrapper.addWidget(status_frame)
-        status_wrapper.addStretch()
-        main_layout.addLayout(status_wrapper, 0)
 
         # Кнопка анализа
         self.analyze_btn = QPushButton("Проанализировать")
