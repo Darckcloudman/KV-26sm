@@ -105,6 +105,7 @@ from ..parsers.rd2_parser import MultiSensorRD2Parser
 from ..dal.repositories.base import IVibrationRepository
 from ..app_settings import get_last_archive_dir, set_last_archive_dir
 from .directory_tree_dialog import DirectoryTreeDialog
+from .archive_tree_dialog import ArchiveTreeDialog
 from .styled_message_box import show_critical, show_warning, show_info
 
 
@@ -738,14 +739,13 @@ class HomeScreen(QWidget):
             self._parse_archive(file_path)
 
     def _load_archive(self):
+        """Открыть кастомный диалог выбора .zip архива."""
         try:
-            file_path, _ = QFileDialog.getOpenFileName(
-                self, "Выберите архив", str(self.archive_dir),
-                "Архивы (*.zip)",
-                options=QFileDialog.DontUseNativeDialog
-            )
-            if file_path:
-                self._parse_archive(file_path)
+            dialog = ArchiveTreeDialog(self, str(self.archive_dir))
+            if dialog.exec() == QDialog.Accepted:
+                file_path = dialog.get_selected_file()
+                if file_path:
+                    self._parse_archive(file_path)
         except Exception as e:
             show_critical(self, "Ошибка", f"Не удалось открыть диалог:\n{str(e)}")
 
