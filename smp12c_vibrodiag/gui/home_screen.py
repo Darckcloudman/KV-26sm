@@ -633,35 +633,6 @@ class HomeScreen(QWidget):
         middle_layout.addWidget(right_panel, 1)
         main_layout.addLayout(middle_layout, 2)
 
-        # Список статусов (табличный вид — 3 колонки)
-        status_frame = QFrame()
-        status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
-        status_layout = QGridLayout(status_frame)
-        status_layout.setContentsMargins(12, 8, 12, 8)
-        status_layout.setHorizontalSpacing(8)
-        status_layout.setVerticalSpacing(4)
-        status_layout.setColumnStretch(1, 1)   # Описание растягивается
-        status_layout.setColumnStretch(2, 0)   # Статус — фиксированная ширина
-
-        self.status_labels = {}
-        for i, desc in enumerate(SENSOR_DESCRIPTIONS):
-            sensor_id = i + 1
-
-            num_label = QLabel(f"{sensor_id}.")
-            num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
-            status_layout.addWidget(num_label, i, 0, alignment=Qt.AlignTop)
-
-            desc_label = QLabel(desc)
-            desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
-            status_layout.addWidget(desc_label, i, 1, alignment=Qt.AlignTop)
-
-            status_label = QLabel("[нет данных]")
-            status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
-            status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignTop)
-
-            self.status_labels[sensor_id] = status_label
-
         # Кнопка анализа
         self.analyze_btn = QPushButton("Проанализировать")
         self.analyze_btn.setStyleSheet("""
@@ -993,6 +964,7 @@ class HomeScreen(QWidget):
                 has_vel = data['velocity'] is not None
                 has_hf = data['high_freq'] is not None
                 count = sum([has_acc, has_vel, has_hf])
+                
                 if count == 3:
                     status = 'ok'
                 elif count > 0:
