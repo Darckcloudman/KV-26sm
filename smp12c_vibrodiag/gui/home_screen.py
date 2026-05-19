@@ -585,7 +585,7 @@ class HomeScreen(QWidget):
         status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
         status_layout = QGridLayout(status_frame)
         status_layout.setContentsMargins(12, 8, 12, 8)
-        status_layout.setHorizontalSpacing(12)
+        status_layout.setHorizontalSpacing(8)
         status_layout.setVerticalSpacing(4)
         status_layout.setColumnStretch(1, 1)   # Описание растягивается
         status_layout.setColumnStretch(2, 0)   # Статус — фиксированная ширина
