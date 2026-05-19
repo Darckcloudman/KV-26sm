@@ -147,9 +147,10 @@ class ArchiveTreeDialog(QDialog):
 
         # Show Name, Size, Date Modified; hide Type
         self.tree_view.setColumnHidden(2, True)
-        self.tree_view.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tree_view.header().setSectionResizeMode(0, QHeaderView.Interactive)
         self.tree_view.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.tree_view.header().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tree_view.setColumnWidth(0, 350)  # Name column: 50px wider (was ~300px)
 
         # Expand root drives for visibility
         root_index = self.model.index("")
