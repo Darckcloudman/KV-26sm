@@ -106,6 +106,7 @@ from ..dal.repositories.base import IVibrationRepository
 from ..app_settings import get_last_archive_dir, set_last_archive_dir
 from .directory_tree_dialog import DirectoryTreeDialog
 from .archive_tree_dialog import ArchiveTreeDialog
+from .rd2_tree_dialog import Rd2TreeDialog
 from .styled_message_box import show_critical, show_warning, show_info
 
 
@@ -459,6 +460,11 @@ class HomeScreen(QWidget):
             QPushButton:pressed { background-color: #D0D0D0; }
         """
 
+        self.load_rd2_btn = QPushButton("Загрузить файл .rd2")
+        self.load_rd2_btn.setStyleSheet(btn_style)
+        self.load_rd2_btn.clicked.connect(self._load_rd2_file)
+        left_top.addWidget(self.load_rd2_btn)
+
         self.load_btn = QPushButton("Загрузить архив .zip")
         self.load_btn.setStyleSheet(btn_style)
         self.load_btn.clicked.connect(self._load_archive)
@@ -744,6 +750,17 @@ class HomeScreen(QWidget):
         file_path = item.data(Qt.UserRole)
         if file_path and Path(file_path).exists():
             self._parse_archive(file_path)
+
+    def _load_rd2_file(self):
+        """Открыть кастомный диалог выбора .rd2 файла."""
+        try:
+            dialog = Rd2TreeDialog(self, str(self.archive_dir))
+            if dialog.exec() == QDialog.Accepted:
+                file_path = dialog.get_selected_file()
+                if file_path:
+                    self._parse_archive(file_path)
+        except Exception as e:
+            show_critical(self, "Ошибка", f"Не удалось открыть диалог:\n{str(e)}")
 
     def _load_archive(self):
         """Открыть кастомный диалог выбора .zip архива."""
