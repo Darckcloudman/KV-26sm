@@ -101,7 +101,7 @@ class LoadingSpinner(QWidget):
         
         painter.resetTransform()
 
-from ..parsers.rd2_parser import MultiSensorRD2Parser
+from ..parsers.rd2_parser import MultiSensorRD2Parser, RD2Parser
 from ..dal.repositories.base import IVibrationRepository
 from ..app_settings import get_last_archive_dir, set_last_archive_dir
 from .directory_tree_dialog import DirectoryTreeDialog
@@ -752,13 +752,14 @@ class HomeScreen(QWidget):
             self._parse_archive(file_path)
 
     def _load_rd2_file(self):
-        """Открыть кастомный диалог выбора .rd2 файла."""
+        """Открыть кастомный диалог выбора .rd2 файлов (мультивыбор)."""
         try:
             dialog = Rd2TreeDialog(self, str(self.archive_dir))
             if dialog.exec() == QDialog.Accepted:
-                file_path = dialog.get_selected_file()
-                if file_path:
-                    self._parse_archive(file_path)
+                files = dialog.get_selected_files()
+                if files:
+                    # Передаём первый файл или все файлы на обработку
+                    self._parse_rd2_files(files)
         except Exception as e:
             show_critical(self, "Ошибка", f"Не удалось открыть диалог:\n{str(e)}")
 
@@ -772,6 +773,64 @@ class HomeScreen(QWidget):
                     self._parse_archive(file_path)
         except Exception as e:
             show_critical(self, "Ошибка", f"Не удалось открыть диалог:\n{str(e)}")
+
+    def _parse_rd2_files(self, file_paths):
+        """Обработать несколько .rd2 файлов через MultiSensorRD2Parser.
+        
+        Args:
+            file_paths: Список путей к .rd2 файлам (до 24 файлов).
+        """
+        if not file_paths:
+            return
+
+        # Для .rd2 файлов используем прямой парсинг без репозитория
+        self.current_file = file_paths[0]  # Первый файл как основной
+        self._is_loading = True
+        
+        # Блокируем таблицу и кнопки
+        self.archive_table.setEnabled(False)
+        self.load_btn.setEnabled(False)
+        self.load_rd2_btn.setEnabled(False)
+        self.load_rd2_btn.setText("Загрузка...")
+        self.analyze_btn.setEnabled(False)
+
+        # Создаём парсер и добавляем файлы вручную
+        parser = MultiSensorRD2Parser(file_paths[0])
+        
+        # Парсим все файлы
+        for fp in file_paths:
+            try:
+                # Для каждого файла создаём отдельный парсер и合并яем данные
+                single_parser = RD2Parser(fp)
+                data = single_parser.parse()
+                
+                # Извлекаем sensor_id и filter_type из имени файла
+                import re
+                sensor_match = re.search(r'SENSOR_(\d{2})', fp)
+                sensor_id = int(sensor_match.group(1)) if sensor_match else None
+                
+                filter_type = None
+                filename_upper = Path(fp).name.upper()
+                if '_FILTER_' in filename_upper or '_LOW_W' in filename_upper:
+                    filter_type = 'LOW' if 'LOW' in filename_upper else 'FILTER'
+                elif '_HIGH_' in filename_upper:
+                    filter_type = 'HIGH'
+                
+                if sensor_id and filter_type:
+                    if not parser.turbine_metadata:
+                        parser.turbine_metadata = data['metadata']
+                    
+                    parser.sensor_data[sensor_id][filter_type] = {
+                        'timestamps': data['timestamps'],
+                        'values': data['values'],
+                        'metadata': data['metadata']
+                    }
+                    parser._parsed = True
+            except Exception as e:
+                print(f"Ошибка парсинга {fp}: {e}")
+                continue
+        
+        self._on_parse_finished(True, file_paths[0], parser)
 
     def _parse_archive(self, file_path):
         """Загрузить архив через репозиторий."""
@@ -787,6 +846,7 @@ class HomeScreen(QWidget):
         # Блокируем таблицу и кнопки
         self.archive_table.setEnabled(False)
         self.load_btn.setEnabled(False)
+        self.load_rd2_btn.setEnabled(False)
         self.load_btn.setText("Загрузка...")
         self.analyze_btn.setEnabled(False)
 
@@ -811,6 +871,8 @@ class HomeScreen(QWidget):
         self.archive_table.setEnabled(True)
         self.load_btn.setEnabled(True)
         self.load_btn.setText("Загрузить архив .zip")
+        self.load_rd2_btn.setEnabled(True)
+        self.load_rd2_btn.setText("Загрузить файл .rd2")
 
         if not success:
             show_critical(self, "Ошибка", "Не удалось обработать архив.")
@@ -833,6 +895,8 @@ class HomeScreen(QWidget):
         self.archive_table.setEnabled(True)
         self.load_btn.setEnabled(True)
         self.load_btn.setText("Загрузить архив .zip")
+        self.load_rd2_btn.setEnabled(True)
+        self.load_rd2_btn.setText("Загрузить файл .rd2")
         show_critical(self, "Ошибка", f"Ошибка при обработке:\n{error_msg}")
 
     def _show_loading_spinner(self, row):

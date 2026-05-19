@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Custom RD2 file selection dialog with tree view. Dark theme."""
+"""Custom RD2 file selection dialog with tree view. Dark theme. Supports multi-select."""
 
 from pathlib import Path
 from PySide6.QtWidgets import (
@@ -7,19 +7,24 @@ from PySide6.QtWidgets import (
     QTreeView, QLineEdit, QHeaderView, QAbstractItemView,
     QFileSystemModel, QFrame
 )
-from PySide6.QtCore import QDir, QSize
+from PySide6.QtCore import QDir, QSize, QItemSelectionModel
 import qtawesome as qta
 from .styled_message_box import show_warning
 
 
 class Rd2TreeDialog(QDialog):
-    """RD2 file picker with QFileSystemModel + QTreeView. Shows only .rd2 files."""
+    """RD2 file picker with QFileSystemModel + QTreeView. Shows only .rd2 files.
+    
+    Supports multi-select up to 24 files (3 filters × 8 sensors).
+    """
+
+    MAX_FILES = 24
 
     def __init__(self, parent=None, initial_path=None):
         super().__init__(parent)
-        self.setWindowTitle("Select RD2 File")
+        self.setWindowTitle("Select RD2 Files")
         self.setFixedSize(480, 530)
-        self.selected_file = None
+        self.selected_files = []
         self._history = []
         self._history_index = -1
         self._navigating_history = False
@@ -94,9 +99,9 @@ class Rd2TreeDialog(QDialog):
         nav_layout.addStretch()
         layout.addLayout(nav_layout)
 
-        # Tree view
+        # Tree view with multi-select
         self.tree_view = QTreeView()
-        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree_view.setAlternatingRowColors(False)
         self.tree_view.setAnimated(True)
         self.tree_view.setIndentation(20)
@@ -107,12 +112,18 @@ class Rd2TreeDialog(QDialog):
         self.tree_view.setIconSize(QSize(16, 16))
         layout.addWidget(self.tree_view)
 
+        # Selection info label
+        self.selection_label = QLabel("Selected: 0 files (max 24)")
+        self.selection_label.setStyleSheet("color: #AAAAAA; font-size: 10px; background: transparent;")
+        layout.addWidget(self.selection_label)
+
         # Path bar
         path_layout = QHBoxLayout()
-        path_label = QLabel("File:")
+        path_label = QLabel("Files:")
         path_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
         self.path_edit = QLineEdit()
         self.path_edit.setReadOnly(True)
+        self.path_edit.setPlaceholderText("Select .rd2 files (Ctrl+Click for multiple)")
         path_layout.addWidget(path_label)
         path_layout.addWidget(self.path_edit, 1)
         layout.addLayout(path_layout)
@@ -134,6 +145,7 @@ class Rd2TreeDialog(QDialog):
 
         self.tree_view.clicked.connect(self._on_tree_clicked)
         self.tree_view.doubleClicked.connect(self._on_tree_double_clicked)
+        self.tree_view.selectionModel().selectionChanged.connect(self._update_selection_display)
 
     def _setup_model(self, initial_path):
         self.model = QFileSystemModel()
@@ -453,29 +465,57 @@ class Rd2TreeDialog(QDialog):
             }
         """)
 
+    def _get_selected_files(self):
+        """Get list of selected .rd2 files from tree view."""
+        indexes = self.tree_view.selectionModel().selectedIndexes()
+        files = []
+        seen = set()
+        for idx in indexes:
+            if idx.column() != 0:
+                continue
+            path = self.model.filePath(idx)
+            if path not in seen and not self.model.isDir(idx) and path.lower().endswith('.rd2'):
+                files.append(path)
+                seen.add(path)
+        return files
+
+    def _update_selection_display(self):
+        """Update path bar and counter label."""
+        files = self._get_selected_files()
+        count = len(files)
+        self.selection_label.setText(f"Selected: {count} files (max {self.MAX_FILES})")
+        if count == 0:
+            self.path_edit.setText("")
+            self.path_edit.setPlaceholderText("Select .rd2 files (Ctrl+Click for multiple)")
+        elif count <= 3:
+            self.path_edit.setText(", ".join(Path(f).name for f in files))
+        else:
+            self.path_edit.setText(f"{count} files selected")
+
     def _on_tree_clicked(self, index):
         path = self.model.filePath(index)
         if self.model.isDir(index):
-            self.path_edit.setText(path)
-            self.selected_file = None
+            # Single click on directory — navigate
+            if not (self.tree_view.selectionModel().selectedIndexes()):
+                self._update_selection_display()
         else:
-            self.selected_file = path
-            self.path_edit.setText(path)
+            self._update_selection_display()
 
     def _on_tree_double_clicked(self, index):
         path = self.model.filePath(index)
         if self.model.isDir(index):
             self._navigate_to_path(path)
-        else:
-            self.selected_file = path
-            self.path_edit.setText(path)
-            self.accept()
 
     def _on_select(self):
-        if not self.selected_file:
-            show_warning(self, "Warning", "Please select a .rd2 file")
+        files = self._get_selected_files()
+        if not files:
+            show_warning(self, "Warning", "Please select at least one .rd2 file")
             return
+        if len(files) > self.MAX_FILES:
+            show_warning(self, "Warning", f"Too many files selected. Maximum: {self.MAX_FILES}\nSelected: {len(files)}")
+            return
+        self.selected_files = files
         self.accept()
 
-    def get_selected_file(self):
-        return self.selected_file
+    def get_selected_files(self):
+        return self.selected_files
