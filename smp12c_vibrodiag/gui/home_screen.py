@@ -585,21 +585,22 @@ class HomeScreen(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(8)
 
-        # Схема в контейнере со смещением (вверх 50px, влево 50px)
-        scheme_container = QWidget()
-        scheme_container_layout = QVBoxLayout(scheme_container)
-        scheme_container_layout.setContentsMargins(-50, -50, 50, 0)
-        scheme_container_layout.setSpacing(0)
+        # Схема — по центру, прижата к верху
+        scheme_wrapper = QHBoxLayout()
+        scheme_wrapper.addStretch()
         self.scheme = SensorScheme()
         self.scheme.sensor_clicked.connect(self._on_sensor_clicked)
-        scheme_container_layout.addWidget(self.scheme)
-        right_layout.addWidget(scheme_container, 2)
+        scheme_wrapper.addWidget(self.scheme, alignment=Qt.AlignTop)
+        scheme_wrapper.addStretch()
+        right_layout.addLayout(scheme_wrapper, 2)
 
-        # Список статусов (табличный вид — 3 колонки)
+        # Список статусов — по центру
+        status_wrapper = QHBoxLayout()
+        status_wrapper.addStretch()
         status_frame = QFrame()
         status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
         status_layout = QGridLayout(status_frame)
-        status_layout.setContentsMargins(30, 0, 0, 0)  # сдвиг вправо на 30px от таблицы архивов
+        status_layout.setContentsMargins(0, 0, 0, 0)
         status_layout.setHorizontalSpacing(8)
         status_layout.setVerticalSpacing(4)
         status_layout.setColumnStretch(1, 1)   # Описание растягивается
@@ -625,7 +626,9 @@ class HomeScreen(QWidget):
             self.status_labels[sensor_id] = status_label
 
         status_frame.setMaximumWidth(650)
-        right_layout.addWidget(status_frame, 0)
+        status_wrapper.addWidget(status_frame)
+        status_wrapper.addStretch()
+        right_layout.addLayout(status_wrapper, 0)
 
         middle_layout.addWidget(right_panel, 1)
         main_layout.addLayout(middle_layout, 2)
