@@ -150,7 +150,7 @@ class ArchiveTreeDialog(QDialog):
         self.tree_view.header().setSectionResizeMode(0, QHeaderView.Interactive)
         self.tree_view.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.tree_view.header().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.tree_view.setColumnWidth(0, 350)  # Name column: 50px wider (was ~300px)
+        self.tree_view.setColumnWidth(0, 280)  # Name column: 50px wider (was ~300px)
 
         # Expand root drives for visibility
         root_index = self.model.index("")

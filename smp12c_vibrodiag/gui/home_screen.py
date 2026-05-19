@@ -264,9 +264,9 @@ class SensorIndicator(QWidget):
         """Отрисовка кружка индикатора.
 
         Логика отображения по статусам:
-          empty   → чёрная рамка, прозрачный центр, чёрный номер
-          ok      → зелёная пульсирующая рамка, прозрачный центр, чёрный номер
-          partial → жёлтая пульсирующая рамка, прозрачный центр, чёрный номер
+          empty   → чёрная рамка, белый центр, чёрный номер
+          ok      → зелёная пульсирующая рамка, белый центр, чёрный номер
+          partial → жёлтая пульсирующая рамка, белый центр, чёрный номер
           none    → красная рамка, белый центр, белый номер
         """
         painter = QPainter(self)
@@ -276,19 +276,19 @@ class SensorIndicator(QWidget):
 
         if self.status == 'empty':
             border_color = QColor("#000000")
-            fill_brush = Qt.NoBrush
+            fill_brush = QBrush(QColor("#FFFFFF"))
             text_color = QColor("#000000")
         elif self.status == 'ok':
             bright = QColor("#4CAF50")
             dark = QColor("#1a4a1a")
             border_color = self._lerp_color(dark, bright, self._glow)
-            fill_brush = Qt.NoBrush
+            fill_brush = QBrush(QColor("#FFFFFF"))
             text_color = QColor("#000000")
         elif self.status == 'partial':
             bright = QColor("#FFC107")
             dark = QColor("#4a3a00")
             border_color = self._lerp_color(dark, bright, self._glow)
-            fill_brush = Qt.NoBrush
+            fill_brush = QBrush(QColor("#FFFFFF"))
             text_color = QColor("#000000")
         else:
             border_color = QColor("#F44336")
@@ -837,7 +837,7 @@ class HomeScreen(QWidget):
             table_pos = self.archive_table.mapToGlobal(rect.topLeft())
             local_pos = self.mapFromGlobal(table_pos)
             
-            # Справа от таблицы + 230px, центрирование по вертикали вниз
+            # Справа от таблицы спиннер, центрирование по вертикали вниз
             x = local_pos.x() + rect.width() + 15
             y = local_pos.y() + (rect.height() - 10) // 2 + 27
             
