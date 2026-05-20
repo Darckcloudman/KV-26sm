@@ -27,12 +27,13 @@
 import re
 from pathlib import Path
 from datetime import datetime
+from typing import Dict
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView,
     QFrame, QSizePolicy, QProgressBar, QAbstractItemView, QTreeView,
-    QDialog
+    QDialog, QLineEdit, QCheckBox
 )
 from PySide6.QtCore import Qt, QThread, Signal, QRect, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
 from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette
@@ -144,11 +145,13 @@ class ParseThread(QThread):
     finished = Signal(bool, str, object)
     error = Signal(str)
     progress = Signal(int)  # Сигнал прогресса (0-100)
+    load_result = Signal(object)  # Dict с результатами загрузки (added, skipped, errors)
 
-    def __init__(self, file_path: str, repository: IVibrationRepository):
+    def __init__(self, file_path: str, repository: IVibrationRepository, persistence_service=None):
         super().__init__()
         self.file_path = file_path
         self.repository = repository
+        self.persistence_service = persistence_service
         self._is_cancelled = False
 
     def cancel(self):
@@ -168,16 +171,25 @@ class ParseThread(QThread):
                 if not self._is_cancelled:
                     self.progress.emit(25)
                 
-                # Загружаем архив
-                success = loop.run_until_complete(
-                    self.repository.load_archive(Path(self.file_path))
-                )
+                # Если есть persistence_service — используем его (v1.4+)
+                if self.persistence_service is not None:
+                    load_result = loop.run_until_complete(
+                        self.persistence_service.save_archive(Path(self.file_path))
+                    )
+                else:
+                    # Fallback: используем репозиторий напрямую
+                    load_result = loop.run_until_complete(
+                        self.repository.load_archive(Path(self.file_path))
+                    )
                 
                 if self._is_cancelled:
                     return
                 
+                # Отправляем результаты загрузки
+                self.load_result.emit(load_result)
+                
                 # Прогресс: загрузка завершена (50%)
-                if success:
+                if load_result.get('success', False):
                     self.progress.emit(50)
                     
                     # Получаем парсер для обратной совместимости
@@ -393,16 +405,20 @@ class HomeScreen(QWidget):
     """Вкладка Home."""
     analyze_requested = Signal(object)
 
-    def __init__(self, repository: IVibrationRepository, parent=None):
+    def __init__(self, repository: IVibrationRepository, persistence_service=None, auto_scan_service=None, parent=None):
         """
         Инициализация HomeScreen.
 
         Args:
             repository: Репозиторий для доступа к данным.
+            persistence_service: Сервис сохранения данных (v1.4+).
+            auto_scan_service: Сервис автопарсинга (v1.4+).
             parent: Родительский виджет.
         """
         super().__init__(parent)
         self.repository = repository
+        self.persistence_service = persistence_service
+        self.auto_scan_service = auto_scan_service
         self.parser = None
         self.current_file = None
         
@@ -413,6 +429,7 @@ class HomeScreen(QWidget):
         else:
             self.archive_dir = Path(__file__).resolve().parent.parent.parent / "test_data"
         
+        self._all_archives = []  # Все архивы для фильтрации
         self._setup_ui()
         self._scan_archives()
 
@@ -420,6 +437,16 @@ class HomeScreen(QWidget):
         self._loading_spinner = None
         self._loading_row = -1
         self._is_loading = False
+
+        # Запускаем автопарсинг если доступен
+        if self.auto_scan_service is not None:
+            self.auto_scan_service.start_timer(self)
+            self.auto_scan_service.start_scan(
+                on_progress=self._on_scan_progress,
+                on_archive=self._on_scan_archive,
+                on_finished=self._on_scan_finished,
+                on_error=self._on_scan_error
+            )
 
     def _setup_ui(self):
         # Чёрный фон через палитру
@@ -475,10 +502,39 @@ class HomeScreen(QWidget):
         self.dir_btn.clicked.connect(self._select_directory)
         left_top.addWidget(self.dir_btn)
 
-        self.path_label = QLabel(f"Путь к месту хранения архивов:\n{self.archive_dir}")
-        self.path_label.setStyleSheet("color: #ffffff; font-size: 10px; background: transparent;")
-        self.path_label.setWordWrap(True)
-        left_top.addWidget(self.path_label)
+        # --- Автопарсинг (v1.4) ---
+        self.auto_scan_checkbox = QCheckBox("Автоматически импортировать новые архивы")
+        self.auto_scan_checkbox.setStyleSheet("color: #BBBBBB; font-size: 10px; background: transparent;")
+        self.auto_scan_checkbox.setChecked(self.auto_scan_service is not None and self.auto_scan_service.enabled)
+        self.auto_scan_checkbox.stateChanged.connect(self._on_auto_scan_toggled)
+        left_top.addWidget(self.auto_scan_checkbox)
+        
+        self.scan_now_btn = QPushButton("Сканировать хранилище")
+        self.scan_now_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                color: #FFFFFF;
+                font-size: 11px;
+                padding: 6px 16px;
+                border: 1px solid #555555;
+                border-radius: 2px;
+                min-width: 190px;
+                text-align: left;
+            }
+            QPushButton:hover { background-color: #444444; }
+            QPushButton:pressed { background-color: #555555; }
+            QPushButton:disabled { background-color: #222222; color: #666666; }
+        """)
+        self.scan_now_btn.clicked.connect(self._start_manual_scan)
+        self.scan_now_btn.setEnabled(self.auto_scan_service is not None)
+        left_top.addWidget(self.scan_now_btn)
+        
+        self.scan_status_label = QLabel("")
+        self.scan_status_label.setStyleSheet("color: #888888; font-size: 9px; background: transparent;")
+        self.scan_status_label.setWordWrap(True)
+        left_top.addWidget(self.scan_status_label)
+        # --- Конец автопарсинга ---
+        
         left_top.addStretch()
 
         top_layout.addLayout(left_top, 0)
@@ -493,7 +549,44 @@ class HomeScreen(QWidget):
         table_frame = QFrame()
         table_frame.setStyleSheet("QFrame { background-color: #ff0000; border: 1px solid #333333; border-radius: 4px; }")
         table_layout = QVBoxLayout(table_frame)
-        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setContentsMargins(8, 8, 8, 8)
+
+        # Поле поиска
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Поиск...")
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #2A2A2A;
+                color: #FFFFFF;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #666666;
+            }
+        """)
+        self.search_input.textChanged.connect(self._filter_archives)
+        search_layout.addWidget(self.search_input)
+        
+        self.search_clear_btn = QPushButton("Очистить")
+        self.search_clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                color: #AAAAAA;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                padding: 5px 12px;
+                font-size: 10px;
+            }
+            QPushButton:hover { background-color: #444444; color: #FFFFFF; }
+        """)
+        self.search_clear_btn.setFixedWidth(70)
+        self.search_clear_btn.clicked.connect(self._clear_search)
+        search_layout.addWidget(self.search_clear_btn)
+        table_layout.addLayout(search_layout)
 
         self.archive_table = QTableWidget()
         self.archive_table.setColumnCount(3)  # WTG, Дата, Размер
@@ -686,15 +779,15 @@ class HomeScreen(QWidget):
             show_critical(
                 self, "Ошибка", f"Не удалось открыть диалог:\n{str(e)}"
             )
-
+            
     def _scan_archives(self):
         """Сканировать каталог и заполнить таблицу архивами (.zip)."""
         try:
+            self._all_archives = []  # Сохраняем все данные для фильтрации
             self.archive_table.setRowCount(0)
             if not self.archive_dir.exists():
                 return
 
-            archives = []
             for f in sorted(self.archive_dir.iterdir()):
                 try:
                     # Только .zip архивы
@@ -702,19 +795,63 @@ class HomeScreen(QWidget):
                         size_kb = f.stat().st_size / 1024
                         date_str = self._extract_date_from_filename(f.name)
                         turbine = self._extract_wtg_from_filename(f.name)
-                        archives.append((turbine, date_str, f"{size_kb:.0f} КБ", str(f)))
+                        self._all_archives.append({
+                            'turbine': turbine,
+                            'date_str': date_str,
+                            'size': f"{size_kb:.0f} КБ",
+                            'path': str(f),
+                            'filename': f.name
+                        })
                 except Exception:
                     continue
 
-            for row_idx, (turbine, date_str, size, path) in enumerate(archives):
-                self.archive_table.insertRow(row_idx)
-                item0 = QTableWidgetItem(turbine)
-                item0.setData(Qt.UserRole, path)
-                self.archive_table.setItem(row_idx, 0, item0)
-                self.archive_table.setItem(row_idx, 1, QTableWidgetItem(date_str))
-                self.archive_table.setItem(row_idx, 2, QTableWidgetItem(size))
+            self._apply_filter()
         except Exception as e:
             show_critical(self, "Ошибка", f"Ошибка сканирования:\n{str(e)}")
+
+    def _filter_archives(self, text: str):
+        """Фильтровать таблицу по введённому тексту."""
+        self._apply_filter(text)
+
+    def _clear_search(self):
+        """Очистить поле поиска."""
+        self.search_input.clear()
+        self._apply_filter()
+
+    def _apply_filter(self, filter_text: str = ""):
+        """Применить фильтр к таблице архивов."""
+        self.archive_table.setRowCount(0)
+        
+        filter_lower = filter_text.strip().lower()
+        filtered = []
+        
+        for archive in self._all_archives:
+            if not filter_lower:
+                filtered.append(archive)
+            else:
+                # Поиск по турбине, дате и имени файла
+                searchable = f"{archive['turbine']} {archive['date_str']} {archive['filename']}".lower()
+                if filter_lower in searchable:
+                    filtered.append(archive)
+        
+        if not filtered and self._all_archives:
+            # Ничего не найдено
+            self.archive_table.insertRow(0)
+            no_result = QTableWidgetItem("Ничего не найдено")
+            no_result.setFlags(Qt.ItemIsEnabled)
+            no_result.setTextAlignment(Qt.AlignCenter)
+            no_result.setForeground(QColor("#888888"))
+            self.archive_table.setItem(0, 0, no_result)
+            self.archive_table.setSpan(0, 0, 1, 3)
+            return
+        
+        for row_idx, archive in enumerate(filtered):
+            self.archive_table.insertRow(row_idx)
+            item0 = QTableWidgetItem(archive['turbine'])
+            item0.setData(Qt.UserRole, archive['path'])
+            self.archive_table.setItem(row_idx, 0, item0)
+            self.archive_table.setItem(row_idx, 1, QTableWidgetItem(archive['date_str']))
+            self.archive_table.setItem(row_idx, 2, QTableWidgetItem(archive['size']))
 
     def _extract_date_from_filename(self, filename):
         match = re.search(r'(\d{8})', filename)
@@ -869,11 +1006,106 @@ class HomeScreen(QWidget):
             self._loading_row = current_row
             self._show_loading_spinner(current_row)
 
-        # Передаём репозиторий в поток
-        self.parse_thread = ParseThread(file_path, self.repository)
+        # Передаём репозиторий и persistence_service в поток
+        self.parse_thread = ParseThread(
+            file_path, self.repository, self.persistence_service
+        )
         self.parse_thread.finished.connect(self._on_parse_finished)
         self.parse_thread.error.connect(self._on_parse_error)
+        self.parse_thread.load_result.connect(self._on_load_result)  # Новый сигнал
         self.parse_thread.start()
+
+    # === Автопарсинг (v1.4) ===
+    
+    def _on_auto_scan_toggled(self, state):
+        """Включить/выключить автопарсинг."""
+        if self.auto_scan_service is not None:
+            self.auto_scan_service.enabled = (state == Qt.Checked)
+            if self.auto_scan_service.enabled:
+                self.auto_scan_service.start_timer(self)
+            else:
+                self.auto_scan_service.stop_timer()
+    
+    def _start_manual_scan(self):
+        """Запустить ручное сканирование хранилища."""
+        if self.auto_scan_service is None:
+            show_warning(self, "Автопарсинг недоступен", 
+                        "Сервис автопарсинга не инициализирован. "
+                        "Проверьте настройки подключения к БД.")
+            return
+        
+        if self.auto_scan_service.is_running():
+            show_info(self, "Сканирование", "Сканирование уже выполняется.")
+            return
+        
+        self.scan_now_btn.setEnabled(False)
+        self.scan_now_btn.setText("Сканирование...")
+        self.scan_status_label.setText("Сканирование запущено...")
+        
+        self.auto_scan_service.start_scan(
+            on_progress=self._on_scan_progress,
+            on_archive=self._on_scan_archive,
+            on_finished=self._on_scan_finished,
+            on_error=self._on_scan_error
+        )
+    
+    def _on_scan_progress(self, found, processed, skipped, total):
+        """Обновление прогресса сканирования."""
+        self.scan_status_label.setText(
+            f"Найдено: {found}, обработано: {processed}, "
+            f"пропущено: {skipped}"
+        )
+    
+    def _on_scan_archive(self, name, added, skipped):
+        """Обработан один архив."""
+        logger.debug("Автопарсинг: %s — добавлено %d, пропущено %d", name, added, skipped)
+    
+    def _on_scan_finished(self, result):
+        """Сканирование завершено."""
+        self.scan_now_btn.setEnabled(True)
+        self.scan_now_btn.setText("Сканировать хранилище")
+        
+        if result.processed > 0:
+            self.scan_status_label.setText(
+                f"Готово: обработано {result.processed} архивов, "
+                f"добавлено {result.added_records} записей"
+            )
+            # Показываем статусное сообщение в главном окне
+            from .main_window import MainWindow
+            main_win = self.window()
+            if isinstance(main_win, MainWindow):
+                main_win.show_status_message(
+                    f"Автопарсинг: добавлено {result.added_records} записей из {result.processed} архивов",
+                    "mdi.check-circle"
+                )
+        else:
+            self.scan_status_label.setText("Новых архивов не найдено")
+    
+    def _on_scan_error(self, error_msg):
+        """Ошибка сканирования."""
+        self.scan_now_btn.setEnabled(True)
+        self.scan_now_btn.setText("Сканировать хранилище")
+        self.scan_status_label.setText(f"Ошибка: {error_msg}")
+        logger.error("Ошибка автопарсинга: %s", error_msg)
+
+    # === Конец автопарсинга ===
+
+    def _on_load_result(self, result: Dict):
+        """Обработчик результатов загрузки (дедупликация)."""
+        # Сохраняем для использования в _on_parse_finished
+        self._last_load_result = result
+        
+        # Логируем результаты
+        added = result.get('added', 0)
+        skipped = result.get('skipped', 0)
+        errors = result.get('errors', [])
+        
+        if errors:
+            for err in errors:
+                logger.error("Ошибка загрузки: %s", err)
+        
+        if added > 0 or skipped > 0:
+            logger.info("Результаты загрузки: добавлено=%d, пропущено=%d", added, skipped)
 
     def _on_parse_finished(self, success, file_path, parser):
         """Обработчик завершения загрузки."""
@@ -888,7 +1120,10 @@ class HomeScreen(QWidget):
         self.load_rd2_btn.setText("Загрузить файл .rd2")
 
         if not success:
-            show_critical(self, "Ошибка", "Не удалось обработать архив.")
+            # Проверяем ошибки из результата загрузки
+            errors = getattr(self, '_last_load_result', {}).get('errors', [])
+            error_msg = errors[0] if errors else "Не удалось обработать архив."
+            show_critical(self, "Ошибка", error_msg)
             return
 
         if parser is None:
@@ -898,6 +1133,27 @@ class HomeScreen(QWidget):
         self.parser = parser
         self._update_sensor_statuses()
         self.analyze_btn.setEnabled(True)
+
+        # Показываем результаты дедупликации
+        result = getattr(self, '_last_load_result', {})
+        added = result.get('added', 0)
+        skipped = result.get('skipped', 0)
+        
+        if added > 0 or skipped > 0:
+            # Показываем уведомление в статус-баре главного окна
+            from .main_window import MainWindow
+            main_win = self.window()
+            if isinstance(main_win, MainWindow):
+                if skipped > 0:
+                    main_win.show_status_message(
+                        f"Загружено: {added} новых, пропущено: {skipped} дубликатов",
+                        "mdi.info"
+                    )
+                else:
+                    main_win.show_status_message(
+                        f"Загружено {added} новых записей",
+                        "mdi.check-circle"
+                    )
 
     def _on_parse_error(self, error_msg):
         """Обработчик ошибки загрузки."""
