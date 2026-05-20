@@ -14,7 +14,8 @@ class Turbine(Base):
     """
     Модель турбины ВЭУ.
     
-    Хранит основную информацию о ветротурбине.
+    Хранит основную информацию о ветротурбине и привязанный прибор SMP12C.
+    Один прибор (по serial_number или MAC) закреплён за одной турбиной.
     """
     
     __tablename__ = "turbines"
@@ -31,11 +32,50 @@ class Turbine(Base):
         nullable=True,
         comment="Полное наименование турбины"
     )
+    
+    # === Идентификаторы прибора SMP12C ===
+    device: Mapped[str] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="Модель устройства (например, 12C)"
+    )
+    serial_number: Mapped[str] = mapped_column(
+        String(50),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="Серийный номер прибора (уникальный, главный идентификатор)"
+    )
+    mac_address: Mapped[str] = mapped_column(
+        String(17),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="MAC-адрес прибора (уникальный, резервный идентификатор)"
+    )
+    ip_address: Mapped[str] = mapped_column(
+        String(45),
+        nullable=True,
+        comment="IP-адрес прибора (может меняться)"
+    )
+    firmware_version: Mapped[str] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="Версия прошивки прибора"
+    )
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
         comment="Дата создания записи"
     )
     
+    # Индексы для быстрого поиска
+    __table_args__ = (
+        Index('idx_turbine_wtg', 'wtg_id'),
+        Index('idx_turbine_serial', 'serial_number'),
+        Index('idx_turbine_mac', 'mac_address'),
+    )
+    
     def __repr__(self) -> str:
-        return f"<Turbine(id={self.id}, wtg_id='{self.wtg_id}')>"
+        return f"<Turbine(id={self.id}, wtg_id='{self.wtg_id}', serial='{self.serial_number}')>"

@@ -3,8 +3,9 @@
 Модель архивной записи.
 """
 
+from typing import Optional
 from datetime import datetime
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Index
+from sqlalchemy import String, DateTime, Integer, Float, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -45,6 +46,45 @@ class Archive(Base):
         nullable=True,
         comment="Размер файла в КБ"
     )
+    # Метрики турбины из метаданных файла
+    power_kw: Mapped[float] = mapped_column(
+        Float,
+        nullable=True,
+        comment="Активная мощность (кВт)"
+    )
+    generator_speed_rpm: Mapped[float] = mapped_column(
+        Float,
+        nullable=True,
+        comment="Частота вращения генератора (RPM)"
+    )
+    wind_speed_ms: Mapped[float] = mapped_column(
+        Float,
+        nullable=True,
+        comment="Скорость ветра (м/с)"
+    )
+    cumulative_power_kwh: Mapped[float] = mapped_column(
+        Float,
+        nullable=True,
+        comment="Накопленная выработка (кВт·ч)"
+    )
+    
+    # === Идентификаторы записи (для дедупликации) ===
+    sensor_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Номер датчика (1-8)"
+    )
+    filter_type: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        comment="Тип фильтра: FILTER, LOW, HIGH"
+    )
+    sensor_serial: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="Серийный номер датчика (для анализа уникальности, v1.4)"
+    )
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -66,6 +106,9 @@ class Archive(Base):
     
     __table_args__ = (
         Index('idx_archive_turbine_datetime', 'turbine_id', 'record_datetime'),
+        Index('idx_archive_sensor', 'sensor_id', 'filter_type'),
+        # Уникальный ключ для дедупликации записей
+        Index('uq_archive_unique_record', 'turbine_id', 'record_datetime', 'sensor_id', 'filter_type', unique=True),
     )
     
     def __repr__(self) -> str:
