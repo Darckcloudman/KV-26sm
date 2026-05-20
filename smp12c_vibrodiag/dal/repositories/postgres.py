@@ -9,17 +9,60 @@
 
 import hashlib
 import asyncio
+import time
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from ...parsers.rd2_parser import MultiSensorRD2Parser
 from ..database import DatabaseManager
 from ..models import Turbine, Archive, SensorData, AnalysisCache
+from ..logger import get_logger
 from .base import IVibrationRepository
+
+logger = get_logger("PostgresRepository")
+
+
+def _with_retry(max_retries: int = 3, delay: float = 1.0):
+    """
+    Декоратор для повторных попыток при временных сбоях БД.
+    
+    Args:
+        max_retries: Максимальное количество попыток.
+        delay: Задержка между попытками в секундах.
+    """
+    def decorator(func: Callable) -> Callable:
+        async def wrapper(self, *args, **kwargs):
+            last_exception = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return await func(self, *args, **kwargs)
+                except OperationalError as e:
+                    last_exception = e
+                    logger.warning(
+                        "Ошибка БД в %s (попытка %d/%d): %s",
+                        func.__name__, attempt, max_retries, e
+                    )
+                    if attempt < max_retries:
+                        await asyncio.sleep(delay)
+                except SQLAlchemyError as e:
+                    last_exception = e
+                    logger.error(
+                        "SQLAlchemy ошибка в %s: %s",
+                        func.__name__, e, exc_info=True
+                    )
+                    raise
+            logger.error(
+                "Исчерпаны попытки в %s после %d попыток",
+                func.__name__, max_retries
+            )
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 class PostgresRepository(IVibrationRepository):
@@ -54,79 +97,170 @@ class PostgresRepository(IVibrationRepository):
                 sha256.update(chunk)
         return sha256.hexdigest()
     
-    async def load_archive(self, archive_path: Path) -> bool:
+    @_with_retry(max_retries=3, delay=1.0)
+    async def load_archive(self, archive_path: Path) -> Dict[str, Any]:
         """
-        Загрузить архив в базу данных.
+        Загрузить архив в базу данных с дедупликацией.
         
-        Если архив уже загружен (по хэшу), возвращает True.
-        Иначе парсит файл и сохраняет данные в БД.
+        Для каждого .rd2 файла в архиве проверяет уникальность по ключу:
+        (turbine_id, record_datetime, sensor_id, filter_type)
         
         Args:
             archive_path: Путь к файлу .zip или .rd2.
             
         Returns:
-            True если загрузка успешна.
+            Словарь с результатами:
+            - success: bool — общий успех
+            - added: int — количество добавленных записей
+            - skipped: int — количество пропущенных дубликатов
+            - errors: List[str] — список ошибок
         """
+        result = {'success': False, 'added': 0, 'skipped': 0, 'errors': []}
+        
+        logger.info("Загрузка архива: %s", archive_path)
         try:
             archive_path = Path(archive_path)
             if not archive_path.exists():
-                return False
+                logger.error("Файл не найден: %s", archive_path)
+                result['errors'].append(f"Файл не найден: {archive_path}")
+                return result
             
-            # Вычисляем хэш файла
-            file_hash = await asyncio.to_thread(
-                self._compute_file_hash, archive_path
+            # Парсим файл
+            logger.debug("Парсинг файла...")
+            parser = await asyncio.to_thread(
+                self._parse_archive_sync, archive_path
             )
-            file_size_kb = archive_path.stat().st_size // 1024
+            
+            if not parser or not parser._parsed:
+                logger.error("Не удалось распарсить файл: %s", archive_path)
+                result['errors'].append("Не удалось распарсить файл")
+                return result
+            
+                # Получаем метаданные прибора
+                metadata = parser.turbine_metadata or {}
+                wtg_id = metadata.get('wtg_id', 'Unknown')
+                sensor_serial = metadata.get('sensor_serial')  # v1.4: серийный номер датчика
+                
+                device_info = {
+                'device': metadata.get('device'),
+                'serial_number': metadata.get('device_serial'),
+                'mac_address': metadata.get('mac_address'),
+                'ip_address': metadata.get('ip_address'),
+                'firmware_version': metadata.get('firmware_version'),
+            }
+            
+            logger.debug(
+                "Метаданные прибора: device=%s, serial=%s, mac=%s, ip=%s",
+                device_info['device'],
+                device_info['serial_number'],
+                device_info['mac_address'],
+                device_info['ip_address']
+            )
             
             async with self.db_manager.session_factory() as session:
-                # Проверяем, есть ли уже такой архив
-                result = await session.execute(
-                    select(Archive).where(Archive.file_hash == file_hash)
-                )
-                existing = result.scalar_one_or_none()
+                # Получаем или создаём турбину (с проверкой serial/mac)
+                try:
+                    turbine = await self._get_or_create_turbine(
+                        session, wtg_id, device_info
+                    )
+                except ValueError as e:
+                    logger.error("Ошибка привязки прибора: %s", e)
+                    result['errors'].append(str(e))
+                    return result
                 
-                if existing:
-                    # Архив уже загружен
-                    self._current_archive_id = existing.id
-                    return True
-                
-                # Парсим файл
-                parser = await asyncio.to_thread(
-                    self._parse_archive_sync, archive_path
-                )
-                
-                if not parser or not parser._parsed:
-                    return False
-                
-                # Получаем или создаём турбину
-                wtg_id = parser.turbine_metadata.get('wtg_id', 'Unknown')
-                turbine = await self._get_or_create_turbine(session, wtg_id)
-                
-                # Создаём запись архива
+                # Парсим дату-время записи
                 record_datetime = self._parse_record_datetime(
-                    parser.turbine_metadata.get('record_datetime', '')
+                    metadata.get('record_datetime', '')
                 )
                 
-                archive = Archive(
-                    turbine_id=turbine.id,
-                    file_path=str(archive_path),
-                    file_hash=file_hash,
-                    record_datetime=record_datetime,
-                    file_size_kb=file_size_kb
-                )
-                session.add(archive)
-                await session.flush()  # Получаем ID
+                # Получаем метрики турбины
+                metrics = parser.get_turbine_metrics()
+                file_size_kb = archive_path.stat().st_size // 1024
                 
-                # Сохраняем данные датчиков
-                await self._save_sensor_data(session, archive.id, parser)
+                # Обрабатываем каждый датчик и фильтр
+                filter_map = {
+                    'FILTER': 'acceleration',
+                    'LOW': 'velocity',
+                    'HIGH': 'high_freq'
+                }
+                
+                for sensor_id in range(1, 9):
+                    data = parser.get_sensor_data(sensor_id)
+                    if data is None:
+                        continue
+                    
+                    for filter_type, signal_key in filter_map.items():
+                        values = data.get(signal_key)
+                        if values is None or len(values) == 0:
+                            continue
+                        
+                        # Проверяем дедупликацию по уникальному ключу
+                        existing = await self._find_archive_by_unique_key(
+                            session, turbine.id, record_datetime, 
+                            sensor_id, filter_type
+                        )
+                        
+                        if existing:
+                            logger.debug(
+                                "Пропуск дубликата: turbine=%s, datetime=%s, "
+                                "sensor=%d, filter=%s",
+                                wtg_id, record_datetime, sensor_id, filter_type
+                            )
+                            result['skipped'] += 1
+                            continue
+                        
+                        # Создаём запись архива
+                        archive = Archive(
+                            turbine_id=turbine.id,
+                            file_path=str(archive_path),
+                            file_hash="",  # Хэш не используется как основной критерий
+                            record_datetime=record_datetime,
+                            file_size_kb=file_size_kb,
+                            power_kw=metrics.get('power_kw', 0.0),
+                            generator_speed_rpm=metrics.get('generator_speed_rpm', 0.0),
+                            wind_speed_ms=metrics.get('wind_speed_ms', 0.0),
+                            cumulative_power_kwh=metrics.get('cumulative_power_kwh', 0.0),
+                            sensor_id=sensor_id,
+                            filter_type=filter_type,
+                            sensor_serial=sensor_serial  # v1.4
+                        )
+                        session.add(archive)
+                        await session.flush()  # Получаем ID
+                        
+                        # Сохраняем данные датчика
+                        timestamps = data.get(f"{signal_key}_time")
+                        fs = data.get(f"{signal_key}_fs")
+                        
+                        sensor_data = SensorData(
+                            archive_id=archive.id,
+                            sensor_id=sensor_id,
+                            filter_type=filter_type,
+                            timestamps=timestamps.tolist() if hasattr(timestamps, 'tolist') else list(timestamps),
+                            values=values.tolist() if hasattr(values, 'tolist') else list(values),
+                            sampling_frequency=float(fs) if fs else 25600.0,
+                            samples_count=len(values)
+                        )
+                        session.add(sensor_data)
+                
+                        result['added'] += 1
+                        logger.debug(
+                            "Добавлена запись: id=%d, sensor=%d, filter=%s",
+                            archive.id, sensor_id, filter_type
+                        )
                 
                 await session.commit()
-                self._current_archive_id = archive.id
-                return True
+                result['success'] = True
+                
+                logger.info(
+                    "Архив загружен: %s — добавлено %d, пропущено %d",
+                    archive_path.name, result['added'], result['skipped']
+                )
+                return result
                 
         except Exception as e:
-            print(f"Ошибка загрузки архива в БД: {e}")
-            return False
+            logger.error("Ошибка загрузки архива в БД: %s", e, exc_info=True)
+            result['errors'].append(str(e))
+            return result
     
     def _parse_archive_sync(self, archive_path: Path) -> MultiSensorRD2Parser:
         """Синхронный парсинг файла."""
@@ -137,21 +271,146 @@ class PostgresRepository(IVibrationRepository):
     async def _get_or_create_turbine(
         self,
         session: AsyncSession,
-        wtg_id: str
+        wtg_id: str,
+        device_info: Optional[Dict[str, str]] = None
     ) -> Turbine:
-        """Получить или создать турбину."""
+        """
+        Получить или создать турбину по WTG и данным прибора.
+        
+        Порядок поиска:
+        1. По serial_number (главный идентификатор прибора)
+        2. По mac_address (резервный идентификатор)
+        3. По wtg_id (если прибор ещё не зарегистрирован)
+        
+        Args:
+            session: Сессия БД
+            wtg_id: Идентификатор турбины
+            device_info: Словарь с полями прибора (serial_number, mac_address, ip_address, device, firmware_version)
+            
+        Returns:
+            Объект Turbine
+            
+        Raises:
+            ValueError: Если serial привязан к другому wtg_id
+        """
+        device_info = device_info or {}
+        serial_number = device_info.get('serial_number')
+        mac_address = device_info.get('mac_address')
+        
+        # 1. Ищем по serial_number (главный идентификатор)
+        if serial_number:
+            result = await session.execute(
+                select(Turbine).where(Turbine.serial_number == serial_number)
+            )
+            turbine = result.scalar_one_or_none()
+            if turbine:
+                # Проверяем консистентность wtg_id
+                if turbine.wtg_id != wtg_id:
+                    raise ValueError(
+                        f"Несоответствие: прибор с серийным номером {serial_number} "
+                        f"уже привязан к турбине {turbine.wtg_id}, "
+                        f"но текущий файл содержит турбину {wtg_id}. "
+                        f"Загрузка отменена."
+                    )
+                # Обновляем изменяемые поля
+                if mac_address:
+                    turbine.mac_address = mac_address
+                if device_info.get('ip_address'):
+                    turbine.ip_address = device_info['ip_address']
+                if device_info.get('firmware_version'):
+                    turbine.firmware_version = device_info['firmware_version']
+                return turbine
+        
+        # 2. Ищем по mac_address (резервный идентификатор)
+        if mac_address:
+            result = await session.execute(
+                select(Turbine).where(Turbine.mac_address == mac_address)
+            )
+            turbine = result.scalar_one_or_none()
+            if turbine:
+                # Проверяем консистентность wtg_id
+                if turbine.wtg_id != wtg_id:
+                    raise ValueError(
+                        f"Несоответствие: прибор с MAC {mac_address} "
+                        f"уже привязан к турбине {turbine.wtg_id}, "
+                        f"но текущий файл содержит турбину {wtg_id}. "
+                        f"Загрузка отменена."
+                    )
+                # Обновляем serial_number и другие поля
+                if serial_number:
+                    turbine.serial_number = serial_number
+                if device_info.get('ip_address'):
+                    turbine.ip_address = device_info['ip_address']
+                if device_info.get('firmware_version'):
+                    turbine.firmware_version = device_info['firmware_version']
+                return turbine
+        
+        # 3. Ищем по wtg_id
         result = await session.execute(
             select(Turbine).where(Turbine.wtg_id == wtg_id)
         )
         turbine = result.scalar_one_or_none()
         
-        if turbine is None:
-            turbine = Turbine(wtg_id=wtg_id)
-            session.add(turbine)
-            await session.flush()
+        if turbine:
+            # Обновляем данные прибора (если раньше не было)
+            if serial_number and not turbine.serial_number:
+                turbine.serial_number = serial_number
+            if mac_address and not turbine.mac_address:
+                turbine.mac_address = mac_address
+            if device_info.get('device') and not turbine.device:
+                turbine.device = device_info['device']
+            if device_info.get('ip_address'):
+                turbine.ip_address = device_info['ip_address']
+            if device_info.get('firmware_version'):
+                turbine.firmware_version = device_info['firmware_version']
+            return turbine
         
+        # 4. Создаём новую турбину
+        turbine = Turbine(
+            wtg_id=wtg_id,
+            name=wtg_id,
+            device=device_info.get('device'),
+            serial_number=serial_number,
+            mac_address=mac_address,
+            ip_address=device_info.get('ip_address'),
+            firmware_version=device_info.get('firmware_version')
+        )
+        session.add(turbine)
+        await session.flush()
+        logger.info("Создана новая турбина: %s (serial=%s, mac=%s)", wtg_id, serial_number, mac_address)
         return turbine
     
+    async def _find_archive_by_unique_key(
+        self,
+        session: AsyncSession,
+        turbine_id: int,
+        record_datetime: Optional[datetime],
+        sensor_id: int,
+        filter_type: str
+    ) -> Optional[Archive]:
+        """
+        Проверить существование записи по логическому ключу.
+        
+        Уникальный ключ: (turbine_id, record_datetime, sensor_id, filter_type)
+        
+        Returns:
+            Archive если найден, None если нет
+        """
+        if not record_datetime:
+            return None
+            
+        result = await session.execute(
+            select(Archive).where(
+                and_(
+                    Archive.turbine_id == turbine_id,
+                    Archive.record_datetime == record_datetime,
+                    Archive.sensor_id == sensor_id,
+                    Archive.filter_type == filter_type
+                )
+            )
+        )
+        return result.scalar_one_or_none()
+                
     def _parse_record_datetime(self, datetime_str: str) -> Optional[datetime]:
         """Парсить дату-время из метаданных."""
         if not datetime_str:
@@ -208,13 +467,15 @@ class PostgresRepository(IVibrationRepository):
                     samples_count=len(values)
                 )
                 session.add(sensor_data)
-    
+                
+    @_with_retry(max_retries=3, delay=1.0)
     async def get_turbine_metrics(
         self,
         archive_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """Получить метрики турбины из БД."""
         if self._current_archive_id is None:
+            logger.warning("get_turbine_metrics: archive_id не установлен")
             return {
                 'power_kw': 0.0,
                 'generator_speed_rpm': 0.0,
@@ -222,6 +483,7 @@ class PostgresRepository(IVibrationRepository):
                 'cumulative_power_kwh': 0.0
             }
         
+        logger.debug("Получение метрик турбины (archive_id=%d)", self._current_archive_id)
         async with self.db_manager.session_factory() as session:
             result = await session.execute(
                 select(Archive).where(Archive.id == self._current_archive_id)
@@ -229,6 +491,7 @@ class PostgresRepository(IVibrationRepository):
             archive = result.scalar_one_or_none()
             
             if archive is None:
+                logger.warning("Архив id=%d не найден в БД", self._current_archive_id)
                 return {
                     'power_kw': 0.0,
                     'generator_speed_rpm': 0.0,
@@ -236,25 +499,14 @@ class PostgresRepository(IVibrationRepository):
                     'cumulative_power_kwh': 0.0
                 }
             
-            # Получаем данные первого датчика для метрик
-            result = await session.execute(
-                select(SensorData).where(
-                    and_(
-                        SensorData.archive_id == self._current_archive_id,
-                        SensorData.sensor_id == 1
-                    )
-                ).limit(1)
-            )
-            sensor_data = result.scalar_one_or_none()
-            
-            # Если данных в БД нет, возвращаем нули
-            # (в реальности метрики должны храниться отдельно)
-            return {
-                'power_kw': 0.0,
-                'generator_speed_rpm': 0.0,
-                'wind_speed_ms': 0.0,
-                'cumulative_power_kwh': 0.0
+            metrics = {
+                'power_kw': archive.power_kw or 0.0,
+                'generator_speed_rpm': archive.generator_speed_rpm or 0.0,
+                'wind_speed_ms': archive.wind_speed_ms or 0.0,
+                'cumulative_power_kwh': archive.cumulative_power_kwh or 0.0
             }
+            logger.debug("Метрики турбины: %s", metrics)
+            return metrics
     
     async def get_sensor_data(
         self,
@@ -575,3 +827,210 @@ class PostgresRepository(IVibrationRepository):
         """
         # Для совместимости с UI создаём парсер из файла
         return await asyncio.to_thread(self._parse_archive_sync, Path(archive_path))
+
+    # === Методы для работы с ветропарком (v1.4) ===
+
+    async def list_turbines(self) -> List[Dict[str, Any]]:
+        """Получить список всех ВЭУ."""
+        turbines = []
+        
+        async with self.db_manager.session_factory() as session:
+            result = await session.execute(
+                select(Turbine).order_by(Turbine.wtg_id)
+            )
+            db_turbines = result.scalars().all()
+            
+            for turbine in db_turbines:
+                # Считаем количество архивов
+                count_result = await session.execute(
+                    select(Archive).where(Archive.turbine_id == turbine.id)
+                )
+                total_archives = len(count_result.scalars().all())
+                
+                turbines.append({
+                    'wtg_id': turbine.wtg_id,
+                    'name': turbine.name or turbine.wtg_id,
+                    'total_archives': total_archives
+                })
+        
+        logger.info("Получено %d турбин", len(turbines))
+        return turbines
+
+    @_with_retry(max_retries=3, delay=1.0)
+    async def get_turbine_statistics(self, wtg_id: str) -> Optional[Dict[str, Any]]:
+        """Получить статистику по конкретной ВЭУ."""
+        logger.debug("Получение статистики для ВЭУ: %s", wtg_id)
+        
+        async with self.db_manager.session_factory() as session:
+            # Находим турбину
+            result = await session.execute(
+                select(Turbine).where(Turbine.wtg_id == wtg_id)
+            )
+            turbine = result.scalar_one_or_none()
+            
+            if turbine is None:
+                logger.warning("Турбина %s не найдена", wtg_id)
+                return None
+            
+            # Получаем все архивы турбины
+            archives_result = await session.execute(
+                select(Archive)
+                .where(Archive.turbine_id == turbine.id)
+                .order_by(Archive.record_datetime.desc())
+            )
+            archives = archives_result.scalars().all()
+            
+            if not archives:
+                return {
+                    'total_archives': 0,
+                    'first_record': None,
+                    'last_record': None,
+                    'avg_rms_per_sensor': {},
+                    'trend_last_10': [],
+                    'critical_count': 0
+                }
+            
+            # Диапазон дат
+            first_record = archives[-1].record_datetime if archives else None
+            last_record = archives[0].record_datetime if archives else None
+            
+            # Критические записи (зона D)
+            critical_count = 0
+            
+            # Средний RMS по датчикам
+            avg_rms_per_sensor = {i: [] for i in range(1, 9)}
+            
+            # Последние 10 записей для тренда
+            trend_last_10 = []
+            
+            for archive in archives[:50]:  # Ограничиваем для производительности
+                # Получаем результаты анализа
+                analysis_result = await session.execute(
+                    select(AnalysisCache).where(
+                        AnalysisCache.archive_id == archive.id
+                    )
+                )
+                analyses = analysis_result.scalars().all()
+                
+                for analysis in analyses:
+                    if analysis.rms_total:
+                        avg_rms_per_sensor[analysis.sensor_id].append(analysis.rms_total)
+                    
+                    # Считаем критические
+                    if analysis.zone == 'D':
+                        critical_count += 1
+                
+                # Для тренда берём датчик 1, фильтр LOW
+                sensor_1_low = next(
+                    (a for a in analyses if a.sensor_id == 1 and a.filter_type == 'LOW'),
+                    None
+                )
+                if sensor_1_low and sensor_1_low.rms_total:
+                    trend_last_10.append({
+                        'date': archive.record_datetime.isoformat() if archive.record_datetime else None,
+                        'rms_total': sensor_1_low.rms_total
+                    })
+            
+            # Усредняем RMS
+            avg_rms_per_sensor = {
+                sensor_id: sum(values) / len(values) if values else 0.0
+                for sensor_id, values in avg_rms_per_sensor.items()
+            }
+            
+            # Берём последние 10 точек тренда
+            trend_last_10 = trend_last_10[:10]
+            
+            stats = {
+                'total_archives': len(archives),
+                'first_record': first_record,
+                'last_record': last_record,
+                'avg_rms_per_sensor': avg_rms_per_sensor,
+                'trend_last_10': trend_last_10,
+                'critical_count': critical_count
+            }
+            
+            logger.debug("Статистика для %s: %d архивов, критических: %d", wtg_id, len(archives), critical_count)
+            return stats
+
+    @_with_retry(max_retries=3, delay=1.0)
+    async def get_rms_trend(
+        self,
+        wtg_id: Optional[str] = None,
+        sensor_id: int = 1,
+        filter_type: str = "LOW"
+    ) -> List[Dict[str, Any]]:
+        """
+        Получить тренд RMS по времени.
+        
+        Если wtg_id is None — агрегируем по всем турбинам (среднее по парку).
+        """
+        logger.debug("Получение тренда RMS: wtg_id=%s, sensor=%d, filter=%s", wtg_id, sensor_id, filter_type)
+        
+        async with self.db_manager.session_factory() as session:
+            if wtg_id:
+                # Конкретная турбина
+                result = await session.execute(
+                    select(Turbine).where(Turbine.wtg_id == wtg_id)
+                )
+                turbine = result.scalar_one_or_none()
+                
+                if turbine is None:
+                    return []
+                
+                # Получаем тренд для конкретной турбины
+                trend_result = await session.execute(
+                    select(AnalysisCache, Archive)
+                    .join(Archive, AnalysisCache.archive_id == Archive.id)
+                    .where(
+                        and_(
+                            Archive.turbine_id == turbine.id,
+                            AnalysisCache.sensor_id == sensor_id,
+                            AnalysisCache.filter_type == filter_type,
+                            AnalysisCache.rms_total.isnot(None)
+                        )
+                    )
+                    .order_by(Archive.record_datetime.asc())
+                )
+                
+                trend_data = []
+                for analysis, archive in trend_result.all():
+                    if analysis.rms_total:
+                        trend_data.append({
+                            'date': archive.record_datetime.isoformat() if archive.record_datetime else None,
+                            'rms_total': analysis.rms_total,
+                            'wtg_id': wtg_id
+                        })
+                
+                return trend_data
+            else:
+                # Агрегация по всему парку (группировка по дате)
+                from sqlalchemy import func
+
+                trend_result = await session.execute(
+                    select(
+                        func.date(Archive.record_datetime).label('date'),
+                        func.avg(AnalysisCache.rms_total).label('avg_rms'),
+                        func.count(AnalysisCache.id).label('count')
+                    )
+                    .join(Archive, AnalysisCache.archive_id == Archive.id)
+                    .where(
+                        and_(
+                            AnalysisCache.sensor_id == sensor_id,
+                            AnalysisCache.filter_type == filter_type,
+                            AnalysisCache.rms_total.isnot(None)
+                        )
+                    )
+                    .group_by(func.date(Archive.record_datetime))
+                    .order_by(func.date(Archive.record_datetime).asc())
+                )
+                
+                trend_data = []
+                for date, avg_rms, count in trend_result.all():
+                    if avg_rms:
+                        trend_data.append({
+                            'date': date.isoformat() if date else None,
+                            'rms_total': float(avg_rms),
+                            'wtg_id': 'AVG_ALL'
+                        })
+                
+                return trend_data
