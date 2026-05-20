@@ -1,61 +1,61 @@
-# Скрипт установки зависимостей и запуска приложения SMP12C VibroDiag
-# Лучшая практика: запускать через powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
+# SMP12C VibroDiag Analyzer - Installation and Launch Script
+# Best practice: run via powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
 
-Write-Host "=== SMP12C VibroDiag Analyzer - Установка и запуск" -ForegroundColor Cyan
+Write-Host "=== SMP12C VibroDiag Analyzer - Installation & Launch" -ForegroundColor Cyan
 Write-Host ""
 
-# Проверка Python
-Write-Host "1. Проверка Python..." -ForegroundColor Yellow
+# Check Python
+Write-Host "1. Checking Python..." -ForegroundColor Yellow
 $pythonVersion = python --version 2>&1
 Write-Host "   Python: $pythonVersion" -ForegroundColor Green
 
-# Создание виртуального окружения
+# Create virtual environment
 Write-Host ""
-Write-Host "2. Создание виртуального окружения..." -ForegroundColor Yellow
+Write-Host "2. Creating virtual environment..." -ForegroundColor Yellow
 if (Test-Path "venv") {
-    Write-Host "   Виртуальное окружение уже существует" -ForegroundColor Gray
+    Write-Host "   Virtual environment already exists" -ForegroundColor Gray
 } else {
     python -m venv venv
-    Write-Host "   Виртуальное окружение создано" -ForegroundColor Green
+    Write-Host "   Virtual environment created" -ForegroundColor Green
 }
 
-# Активация окружения с обработкой политики выполнения
+# Activate environment with execution policy handling
 Write-Host ""
-Write-Host "3. Активация окружения..." -ForegroundColor Yellow
+Write-Host "3. Activating environment..." -ForegroundColor Yellow
 try {
     .\venv\Scripts\Activate.ps1 -ErrorAction Stop
-    Write-Host "   Окружение активировано" -ForegroundColor Green
+    Write-Host "   Environment activated" -ForegroundColor Green
 } catch [System.Management.Automation.PSSecurityException] {
-    Write-Host "   Политика выполнения PowerShell блокирует активацию. Обходим через Bypass..." -ForegroundColor Yellow
+    Write-Host "   PowerShell execution policy blocks activation. Using Bypass..." -ForegroundColor Yellow
     powershell.exe -ExecutionPolicy Bypass -Command ".\venv\Scripts\Activate.ps1"
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "   Ошибка: не удалось активировать окружение. Запустите скрипт через:" -ForegroundColor Red
+        Write-Host "   Error: Failed to activate environment. Run script via:" -ForegroundColor Red
         Write-Host "   powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1" -ForegroundColor Cyan
         exit 1
     }
-    Write-Host "   Окружение активировано (Bypass)" -ForegroundColor Green
+    Write-Host "   Environment activated (Bypass)" -ForegroundColor Green
 } catch {
-    Write-Host "   Ошибка активации: $_" -ForegroundColor Red
+    Write-Host "   Activation error: $_" -ForegroundColor Red
     exit 1
 }
 
-# Обновление pip
+# Update pip
 Write-Host ""
-Write-Host "4. Обновление pip..." -ForegroundColor Yellow
+Write-Host "4. Updating pip..." -ForegroundColor Yellow
 python -m pip install --upgrade pip
-Write-Host "   pip обновлён" -ForegroundColor Green
+Write-Host "   pip updated" -ForegroundColor Green
 
-# Установка зависимостей
+# Install dependencies
 Write-Host ""
-Write-Host "5. Установка зависимостей..." -ForegroundColor Yellow
+Write-Host "5. Installing dependencies..." -ForegroundColor Yellow
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
 python -m pip install -r requirements.txt
-Write-Host "   Зависимости установлены" -ForegroundColor Green
+Write-Host "   Dependencies installed" -ForegroundColor Green
 
-# Запуск приложения
+# Launch application
 Write-Host ""
-Write-Host "6. Запуск приложения..." -ForegroundColor Yellow
+Write-Host "6. Launching application..." -ForegroundColor Yellow
 Write-Host ""
 python -m smp12c_vibrodiag.main
 
