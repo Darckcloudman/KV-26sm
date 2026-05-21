@@ -6,6 +6,8 @@
 Все экраны должны использовать эти стили для консистентности.
 """
 
+import base64
+
 # === ЦВЕТОВАЯ ПАЛИТРА ===
 
 # Основные цвета
@@ -339,6 +341,21 @@ STATUSBAR_ICON_STYLE = f"""
 """
 
 # Чек-боксы (тёмный стиль CodePen: тёмный фон индикатора, зелёная галочка)
+
+def _checkbox_checked_image(bg: str = ZONE_COLORS['A']) -> str:
+    """Генерирует SVG с зелёным фоном и белой галочкой ✓ шрифтом Arial."""
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">'
+        f'<rect width="14" height="14" rx="3" fill="{bg}"/>'
+        '<text x="7" y="11" font-family="Arial" font-size="10" fill="white" text-anchor="middle">✓</text>'
+        '</svg>'
+    )
+    b64 = base64.b64encode(svg.encode('utf-8')).decode('ascii')
+    return f"url('data:image/svg+xml;base64,{b64}')"
+
+
+_CHECKBOX_CHECKED_IMG = _checkbox_checked_image()
+
 CHECKBOX_STYLE = f"""
     QCheckBox {{
         font-size: 11px;
@@ -357,6 +374,7 @@ CHECKBOX_STYLE = f"""
     QCheckBox::indicator:checked {{
         background-color: {ZONE_COLORS['A']};
         border: 1.5px solid {ZONE_COLORS['A']};
+        image: {_CHECKBOX_CHECKED_IMG};
     }}
     QCheckBox::indicator:hover {{
         border-color: {COLOR_TEXT_TERTIARY};
