@@ -82,7 +82,7 @@ class Archive(Base):
     sensor_serial: Mapped[Optional[str]] = mapped_column(
         String(50),
         nullable=True,
-        comment="Серийный номер датчика (для анализа уникальности, v1.4)"
+        comment="Порядковый номер записи за сутки (record_number). Все .rd2 файлы одного архива имеют одинаковое значение. Информационное поле, НЕ используется для дедупликации."
     )
     
     created_at: Mapped[datetime] = mapped_column(

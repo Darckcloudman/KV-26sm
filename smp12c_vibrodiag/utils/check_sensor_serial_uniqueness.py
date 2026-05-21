@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Утилита для анализа уникальности "серийного номера датчика".
+Утилита для анализа поля record_number (sensor_serial) в .rd2 файлах.
 
-Сканирует все .rd2 файлы в указанном корневом каталоге,
-извлекает значение sensor_serial (первое поле строки 1),
-и анализирует:
-  1. Уникален ли номер в пределах одного датчика одного прибора?
-  2. Уникален ли номер глобально?
-  3. Может ли он служить дополнением к уникальному ключу?
+Первое поле строки 1 .rd2 файла — это ПОРЯДКОВЫЙ НОМЕР ЗАПИСИ за сутки
+для конкретной ВЭУ. Все .rd2 файлы внутри одного ZIP-архива (8 датчиков x 3
+фильтра = 24 файла) имеют ОДИНАКОВОЕ значение.
+
+Сканирует все .rd2 файлы и анализирует:
+  1. Совпадают ли номера внутри одного архива?
+  2. Различаются ли номера между разными архивами?
+  3. Может ли поле использоваться для связи файлов одного архива?
 
 Использование:
-    python -m smp12c_vibrodiag.utils.check_sensor_serial_uniqueness D:\\WindFarmData
+    python -m smp12c_vibrodiag.utils.check_sensor_serial_uniqueness D:\WindFarmData
 """
 
 import sys
@@ -34,11 +36,11 @@ def extract_sensor_serial(file_path: Path) -> Tuple[str, str, str, str]:
         if len(lines) < 1:
             return None, None, None, None
         
-        # Строка 1: "38408;01/09/2025 23:45:29;38408;WTG37;Sensor_01;..."
+        # Строка 1: "38408, 01/09/2025 23:45:29, W1436, WTG37, Sensor_01"
         line1 = lines[0].strip()
-        parts = line1.split(';')
+        parts = line1.split(', ')
         
-        if len(parts) < 6:
+        if len(parts) < 5:
             return None, None, None, None
         
         sensor_serial = parts[0].strip()
@@ -174,7 +176,7 @@ def analyze_storage(root_path: Path, max_files: int = None) -> Dict:
 def print_report(results: Dict):
     """Вывести отчёт в консоль."""
     print("\n" + "=" * 60)
-    print("ОТЧЁТ О УНИКАЛЬНОСТИ СЕРИЙНОГО НОМЕРА ДАТЧИКА")
+    print("ОТЧЁТ О ПОЛЕ record_number (sensor_serial) в .rd2 файлах")
     print("=" * 60)
     
     print(f"\nВсего файлов: {results['total_files']}")
@@ -210,18 +212,23 @@ def print_report(results: Dict):
     print("ВЫВОДЫ:")
     print("=" * 60)
     
+    print("Поле record_number (sensor_serial) — это ПОРЯДКОВЫЙ НОМЕР ЗАПИСИ")
+    print("за сутки для конкретной ВЭУ. Все .rd2 файлы одного архива имеют")
+    print("одинаковое значение (например, 38408 для всех 24 файлов).")
+    print()
+    
     if results['global_duplicates'] == 0:
-        print("✓ Серийный номер датчика ГЛОБАЛЬНО УНИКАЛЕН.")
+        print("[OK] Номер ГЛОБАЛЬНО УНИКАЛЕН (каждый файл имеет свой номер).")
         print("  Рекомендация: включить в уникальный ключ archives.")
-    elif results['same_sensor_duplicates'] == 0:
-        print("✓ Серийный номер уникален в пределах одного датчика.")
-        print("  Рекомендация: использовать как вспомогательный идентификатор.")
-    elif results['sensor_filter_duplicates'] == 0:
-        print("✓ Серийный номер уникален в пределах (датчик + фильтр).")
-        print("  Рекомендация: использовать как вспомогательный идентификатор.")
     else:
-        print("✗ Серийный номер НЕ уникален даже в пределах одного датчика.")
-        print("  Рекомендация: игнорировать для дедупликации.")
+        dup_pct = (results['global_duplicates'] / max(results['unique_serials'], 1)) * 100
+        print(f"[WARN] Номер НЕ уникален: {results['global_duplicates']} номеров")
+        print(f"  повторяются в нескольких файлах ({dup_pct:.1f}% от уникальных).")
+        print("  Рекомендация: использовать ТОЛЬКО как информационное поле")
+        print("  (аудит, связь файлов одного архива).")
+        print()
+        print("  Уникальный ключ должен оставаться:")
+        print("  (turbine_id, record_datetime, sensor_id, filter_type)")
     
     print("=" * 60 + "\n")
 

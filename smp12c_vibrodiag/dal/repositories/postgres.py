@@ -136,12 +136,15 @@ class PostgresRepository(IVibrationRepository):
                 result['errors'].append("Не удалось распарсить файл")
                 return result
             
-                # Получаем метаданные прибора
-                metadata = parser.turbine_metadata or {}
-                wtg_id = metadata.get('wtg_id', 'Unknown')
-                sensor_serial = metadata.get('sensor_serial')  # v1.4: серийный номер датчика
-                
-                device_info = {
+            # Получаем метаданные прибора
+            metadata = parser.turbine_metadata or {}
+            wtg_id = metadata.get('wtg_id', 'Unknown')
+            # sensor_serial = record_number — порядковый номер записи за сутки.
+            # Все .rd2 файлы одного ZIP-архива имеют одинаковое значение.
+            # Используется только как информационное поле (аудит), НЕ для дедупликации.
+            sensor_serial = metadata.get('sensor_serial')
+
+            device_info = {
                 'device': metadata.get('device'),
                 'serial_number': metadata.get('device_serial'),
                 'mac_address': metadata.get('mac_address'),

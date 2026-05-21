@@ -104,11 +104,14 @@ class LoadingSpinner(QWidget):
 
 from ..parsers.rd2_parser import MultiSensorRD2Parser, RD2Parser
 from ..dal.repositories.base import IVibrationRepository
+from ..dal.logger import get_logger
 from ..app_settings import get_last_archive_dir, set_last_archive_dir
 from .directory_tree_dialog import DirectoryTreeDialog
 from .archive_tree_dialog import ArchiveTreeDialog
 from .rd2_tree_dialog import Rd2TreeDialog
 from .styled_message_box import show_critical, show_warning, show_info
+
+logger = get_logger("HomeScreen")
 
 
 SENSOR_DESCRIPTIONS = [

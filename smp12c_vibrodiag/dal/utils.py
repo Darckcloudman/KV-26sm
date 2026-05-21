@@ -30,13 +30,13 @@ async def check_database_connection():
     try:
         connected = await db_manager.health_check()
         if connected:
-            print(f"✓ Подключение к БД '{settings.db_name}' успешно")
+            print(f"[OK] Подключение к БД '{settings.db_name}' успешно")
         else:
-            print(f"✗ Не удалось подключиться к БД")
+            print(f"[FAIL] Не удалось подключиться к БД")
         await db_manager.close()
         return connected
     except Exception as e:
-        print(f"✗ Ошибка подключения: {e}")
+        print(f"[ERROR] Ошибка подключения: {e}")
         return False
 
 
@@ -57,10 +57,10 @@ async def drop_all_tables():
     
     try:
         await db_manager.drop_db()
-        print("✓ Все таблицы удалены")
+        print("[OK] Все таблицы удалены")
         await db_manager.close()
     except Exception as e:
-        print(f"✗ Ошибка: {e}")
+        print(f"[ERROR] Ошибка: {e}")
 
 
 def main():
