@@ -1,101 +1,165 @@
 # -*- coding: utf-8 -*-
 """
 Диалог настроек приложения SMP12C VibroDiag Analyzer v1.4
+
+Возможности:
+- Динамическое переключение режима БД (файловый / PostgreSQL)
+- Сканирование хранилища с подробным логом
+- Сохранение настроек без перезапуска
 """
+
+import os
+import re
+import zipfile
+import tempfile
+import shutil
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, Dict, Any, List
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTabWidget, QWidget, QFormLayout, QLineEdit, QSpinBox,
-    QComboBox, QFileDialog, QFrame, QProgressBar, QCheckBox
+    QComboBox, QFileDialog, QFrame, QProgressBar, QCheckBox,
+    QTextEdit, QPlainTextEdit, QGroupBox, QSplitter
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QThread, QTimer
+from PySide6.QtGui import QFont, QTextCursor
 
 from .ui_styles import (
     COLOR_BG_PRIMARY, COLOR_BG_SECONDARY, COLOR_BG_TERTIARY,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_TEXT_TERTIARY,
     COLOR_BORDER, COLOR_ACCENT, COLOR_ACCENT_HOVER,
-    BUTTON_STYLE, BUTTON_SMALL_STYLE
+    BUTTON_STYLE, BUTTON_SMALL_STYLE, CHECKBOX_STYLE, LOG_TEXT_STYLE
 )
+from .styled_message_box import show_info, show_critical
 from ..dal.config import settings
 from ..dal.logger import get_logger
+from ..dal.repository_switcher import RepositorySwitcher
+from ..parsers.adaptive_archive_scanner import AdaptiveArchiveScanner, ArchiveCandidate
 
 logger = get_logger(__name__)
 
 
-class ModuleStatusIndicator(QFrame):
-    """Индикатор статуса модуля."""
-
-    def __init__(self, name: str, description: str, is_critical: bool = False, parent=None):
+class ScanWorker(QThread):
+    """Поток для фонового сканирования хранилища."""
+    
+    log_message = Signal(str)           # HTML-сообщение для лога
+    archive_found = Signal(object)      # ArchiveCandidate
+    progress = Signal(int, int)         # current, total
+    finished_scan = Signal(int, int, int)  # total, processed, errors
+    error = Signal(str)
+    
+    def __init__(self, root_path: Path, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(60)
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_BG_TERTIARY};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 4px;
-            }}
-        """)
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(10)
-
-        # Индикатор (кружок)
-        self.status_dot = QFrame()
-        self.status_dot.setFixedSize(16, 16)
-        self.status_dot.setStyleSheet(f"""
-            QFrame {{
-                background-color: #00C853;
-                border-radius: 8px;
-            }}
-        """)
-        layout.addWidget(self.status_dot)
-
-        # Информация
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
-
-        name_label = QLabel(name)
-        name_label.setStyleSheet(f"""
-            color: {COLOR_TEXT_PRIMARY};
-            font-size: 12px;
-            font-weight: bold;
-        """)
-        info_layout.addWidget(name_label)
-
-        desc_label = QLabel(description)
-        desc_label.setStyleSheet(f"""
-            color: {COLOR_TEXT_TERTIARY};
-            font-size: 10px;
-        """)
-        desc_label.setWordWrap(True)
-        info_layout.addWidget(desc_label)
-
-        layout.addLayout(info_layout, stretch=1)
-
-        # Критичность
-        if is_critical:
-            crit_label = QLabel("КРИТИЧНЫЙ")
-            crit_label.setStyleSheet("""
-                color: #DD2C00;
-                font-size: 9px;
-                font-weight: bold;
-                padding: 2px 6px;
-                background-color: rgba(221, 44, 0, 0.2);
-                border-radius: 2px;
-            """)
-            layout.addWidget(crit_label)
-
-    def set_status(self, ok: bool):
-        """Установить статус модуля."""
-        color = "#00C853" if ok else "#DD2C00"
-        self.status_dot.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color};
-                border-radius: 8px;
-            }}
-        """)
+        self.root_path = Path(root_path)
+        self._is_cancelled = False
+    
+    def cancel(self):
+        """Отменить сканирование."""
+        self._is_cancelled = True
+    
+    def _log(self, message: str, level: str = "INFO"):
+        """Отправить сообщение в лог."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        colors = {
+            "INFO": "#BBBBBB",
+            "SUCCESS": "#00C853",
+            "WARNING": "#FFD600",
+            "ERROR": "#DD2C00",
+            "DEBUG": "#888888"
+        }
+        color = colors.get(level, "#BBBBBB")
+        
+        html = f'<span style="color:#666666;">[{timestamp}]</span> <span style="color:{color};">{message}</span>'
+        self.log_message.emit(html)
+    
+    def run(self):
+        """Запустить сканирование."""
+        try:
+            self._log(f"Начало сканирования хранилища: {self.root_path}", "INFO")
+            
+            if not self.root_path.exists():
+                self._log(f"Корневой каталог не существует: {self.root_path}", "ERROR")
+                self.error.emit(f"Каталог не найден: {self.root_path}")
+                return
+            
+            scanner = AdaptiveArchiveScanner(self.root_path)
+            
+            total_found = 0
+            processed = 0
+            errors = 0
+            
+            def on_archive_found(candidate: ArchiveCandidate):
+                nonlocal processed
+                if self._is_cancelled:
+                    return
+                
+                processed += 1
+                size_mb = candidate.file_size_kb / 1024
+                
+                self._log(
+                    f"Найден архив: {candidate.filename} "
+                    f"(WTG={candidate.wtg_id or 'N/A'}, "
+                    f"датчики={len(candidate.sensors_found)}, "
+                    f"размер={size_mb:.1f} МБ)",
+                    "SUCCESS"
+                )
+                
+                if candidate.rd2_files_count > 0:
+                    self._log(
+                        f"  └─ Внутри: {candidate.rd2_files_count} файлов .rd2, "
+                        f"датчики: {candidate.sensors_found}",
+                        "DEBUG"
+                    )
+                
+                if candidate.errors:
+                    for err in candidate.errors:
+                        self._log(f"  ⚠ {err}", "WARNING")
+                
+                self.archive_found.emit(candidate)
+            
+            def on_progress(current: int, total: int):
+                if self._is_cancelled:
+                    return
+                self.progress.emit(current, total)
+                if total > 0:
+                    pct = current * 100 // total
+                    if current % 10 == 0 or current == total:
+                        self._log(f"Прогресс: {current}/{total} ({pct}%)", "DEBUG")
+            
+            def on_error(error_msg: str):
+                nonlocal errors
+                errors += 1
+                self._log(error_msg, "ERROR")
+            
+            candidates = scanner.scan_with_callback(
+                on_archive_found=on_archive_found,
+                on_progress=on_progress,
+                on_error=on_error
+            )
+            
+            total_found = len(candidates)
+            
+            if self._is_cancelled:
+                self._log("Сканирование отменено пользователем", "WARNING")
+            else:
+                self._log(
+                    f"Сканирование завершено. "
+                    f"Найдено архивов: {total_found}, "
+                    f"обработано: {processed}, "
+                    f"ошибок: {errors}",
+                    "SUCCESS"
+                )
+            
+            self.finished_scan.emit(total_found, processed, errors)
+            
+        except Exception as e:
+            error_msg = f"Критическая ошибка сканирования: {e}"
+            self._log(error_msg, "ERROR")
+            self.error.emit(error_msg)
+            self.finished_scan.emit(0, 0, 1)
 
 
 class SettingsDialog(QDialog):
@@ -103,11 +167,19 @@ class SettingsDialog(QDialog):
 
     settings_changed = Signal()  # Сигнал изменения настроек
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, repository_switcher: Optional[RepositorySwitcher] = None):
         super().__init__(parent)
         self.setWindowTitle("Настройки")
-        self.setMinimumSize(600, 500)
+        self.setMinimumSize(700, 550)
         self.setModal(True)
+        
+        self.repository_switcher = repository_switcher
+        self._scan_worker: Optional[ScanWorker] = None
+
+        # Задать тёмный фон диалогу
+        self.setStyleSheet(f"""
+            background-color: {COLOR_BG_SECONDARY};
+        """)
 
         self._setup_ui()
         self._load_settings()
@@ -125,6 +197,7 @@ class SettingsDialog(QDialog):
             font-size: 18px;
             font-weight: bold;
             padding: 10px;
+            background-color: {COLOR_BG_SECONDARY};
             border-bottom: 2px solid {COLOR_BORDER};
         """)
         layout.addWidget(title)
@@ -177,11 +250,11 @@ class SettingsDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self.save_btn = QPushButton("Сохранить")
-        self.save_btn.setStyleSheet(BUTTON_STYLE)
-        self.save_btn.setFixedWidth(120)
-        self.save_btn.clicked.connect(self._save_settings)
-        btn_layout.addWidget(self.save_btn)
+        self.apply_btn = QPushButton("Применить")
+        self.apply_btn.setStyleSheet(BUTTON_STYLE)
+        self.apply_btn.setFixedWidth(120)
+        self.apply_btn.clicked.connect(self._apply_settings)
+        btn_layout.addWidget(self.apply_btn)
 
         self.cancel_btn = QPushButton("✖ Отмена")
         self.cancel_btn.setStyleSheet(f"""
@@ -210,6 +283,12 @@ class SettingsDialog(QDialog):
         layout = QFormLayout(widget)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
+
+        # Переключатель режима БД
+        self.db_enabled_checkbox = QCheckBox("Использовать PostgreSQL")
+        self.db_enabled_checkbox.setStyleSheet(CHECKBOX_STYLE)
+        self.db_enabled_checkbox.stateChanged.connect(self._on_db_mode_changed)
+        layout.addRow("Режим хранения:", self.db_enabled_checkbox)
 
         # Хост
         self.db_host_input = QLineEdit()
@@ -299,33 +378,27 @@ class SettingsDialog(QDialog):
         """)
         layout.addRow("Задержка повтора:", self.db_retry_delay_input)
 
-        # Использовать БД
-        self.db_enabled_checkbox = QCheckBox("Использовать базу данных")
-        self.db_enabled_checkbox.setStyleSheet(f"""
-            QCheckBox {{
-                color: {COLOR_TEXT_PRIMARY};
-                font-size: 11px;
-            }}
-        """)
-        layout.addRow("", self.db_enabled_checkbox)
+        # Статус подключения
+        self.db_status_label = QLabel("")
+        self.db_status_label.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px;")
+        layout.addRow("Статус:", self.db_status_label)
 
         return widget
 
     def _create_storage_tab(self) -> QWidget:
-        """Создать вкладку настроек хранилища."""
+        """Создать вкладку настроек хранилища с логом сканирования."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
 
-        # Путь
+        # Путь к хранилищу
+        path_group = QHBoxLayout()
+        
         path_label = QLabel("Путь к архивам:")
         path_label.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 11px;")
-        layout.addWidget(path_label)
+        path_group.addWidget(path_label)
         
-        path_layout = QHBoxLayout()
-        path_layout.setSpacing(8)
-
         self.storage_path_input = QLineEdit()
         self.storage_path_input.setStyleSheet(f"""
             QLineEdit {{
@@ -337,42 +410,87 @@ class SettingsDialog(QDialog):
                 font-size: 11px;
             }}
         """)
-        path_layout.addWidget(self.storage_path_input, stretch=1)
+        path_group.addWidget(self.storage_path_input, stretch=1)
 
         browse_btn = QPushButton("Обзор...")
         browse_btn.setStyleSheet(BUTTON_SMALL_STYLE)
         browse_btn.setFixedWidth(80)
         browse_btn.clicked.connect(self._browse_storage_path)
-        path_layout.addWidget(browse_btn)
+        path_group.addWidget(browse_btn)
+        
+        layout.addLayout(path_group)
 
-        layout.addLayout(path_layout)
-
-        # Описание
-        desc_label = QLabel(
-            "Укажите путь к папке с ZIP-архивами данных вибродиагностики.\n"
-            "Приложение будет сканировать эту папку для отображения доступных записей."
-        )
-        desc_label.setStyleSheet(f"""
-            color: {COLOR_TEXT_TERTIARY};
-            font-size: 10px;
-            padding: 10px;
-            background-color: {COLOR_BG_TERTIARY};
-            border-radius: 4px;
+        # Кнопка сканирования + прогресс
+        scan_layout = QHBoxLayout()
+        
+        self.scan_btn = QPushButton("▶ Сканировать хранилище")
+        self.scan_btn.setStyleSheet(BUTTON_STYLE)
+        self.scan_btn.clicked.connect(self._start_scan)
+        scan_layout.addWidget(self.scan_btn)
+        
+        self.scan_cancel_btn = QPushButton("⏹ Отмена")
+        self.scan_cancel_btn.setStyleSheet(BUTTON_SMALL_STYLE)
+        self.scan_cancel_btn.setEnabled(False)
+        self.scan_cancel_btn.clicked.connect(self._cancel_scan)
+        scan_layout.addWidget(self.scan_cancel_btn)
+        
+        self.scan_progress = QProgressBar()
+        self.scan_progress.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {COLOR_BG_TERTIARY};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 3px;
+                text-align: center;
+                color: {COLOR_TEXT_TERTIARY};
+                font-size: 9px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {COLOR_ACCENT};
+                border-radius: 2px;
+            }}
         """)
-        desc_label.setWordWrap(True)
-        layout.addWidget(desc_label)
+        self.scan_progress.setVisible(False)
+        scan_layout.addWidget(self.scan_progress, stretch=1)
+        
+        scan_layout.addStretch()
+        layout.addLayout(scan_layout)
 
-        layout.addStretch()
+        # Лог сканирования
+        log_label = QLabel("Лог сканирования:")
+        log_label.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 11px;")
+        layout.addWidget(log_label)
+        
+        self.scan_log = QTextEdit()
+        self.scan_log.setReadOnly(True)
+        self.scan_log.setStyleSheet(LOG_TEXT_STYLE)
+        self.scan_log.setMinimumHeight(200)
+        self.scan_log.setPlaceholderText("Здесь будет отображаться подробный лог процесса сканирования...")
+        layout.addWidget(self.scan_log, stretch=1)
+        
+        # Кнопка сохранения лога
+        self.save_log_btn = QPushButton("💾 Сохранить лог")
+        self.save_log_btn.setStyleSheet(BUTTON_SMALL_STYLE)
+        self.save_log_btn.setEnabled(False)
+        self.save_log_btn.clicked.connect(self._save_scan_log)
+        layout.addWidget(self.save_log_btn, alignment=Qt.AlignRight)
+
         return widget
 
     def _create_logging_tab(self) -> QWidget:
-        """Создать вкладку настроек логирования."""
+        """Создать вкладку настроек логирования с просмотром логов."""
         widget = QWidget()
-        layout = QFormLayout(widget)
+        layout = QVBoxLayout(widget)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
 
+        # --- Верхняя панель: настройки ---
+        settings_layout = QHBoxLayout()
+        
         # Уровень логирования
+        level_label = QLabel("Уровень логирования:")
+        level_label.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 11px;")
+        settings_layout.addWidget(level_label)
+        
         self.log_level_combo = QComboBox()
         self.log_level_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
         self.log_level_combo.setStyleSheet(f"""
@@ -381,50 +499,97 @@ class SettingsDialog(QDialog):
                 color: {COLOR_TEXT_PRIMARY};
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 4px;
-                padding: 6px 10px;
+                padding: 4px 8px;
                 font-size: 11px;
+                min-width: 100px;
             }}
         """)
-        layout.addRow("Уровень логирования:", self.log_level_combo)
+        settings_layout.addWidget(self.log_level_combo)
+        
+        settings_layout.addSpacing(20)
+        
+        # Чек-боксы
+        self.log_to_file_checkbox = QCheckBox("Записывать в файл")
+        self.log_to_file_checkbox.setStyleSheet(CHECKBOX_STYLE)
+        settings_layout.addWidget(self.log_to_file_checkbox)
+        
+        self.log_to_console_checkbox = QCheckBox("Выводить в консоль")
+        self.log_to_console_checkbox.setStyleSheet(CHECKBOX_STYLE)
+        settings_layout.addWidget(self.log_to_console_checkbox)
+        
+        settings_layout.addStretch()
+        layout.addLayout(settings_layout)
 
-        # Лог в файл
-        self.log_to_file_checkbox = QCheckBox("Записывать логи в файл (app.log)")
-        self.log_to_file_checkbox.setStyleSheet(f"""
-            QCheckBox {{
+        # --- Фильтр логов ---
+        filter_layout = QHBoxLayout()
+        
+        filter_label = QLabel("Фильтр по уровню:")
+        filter_label.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 11px;")
+        filter_layout.addWidget(filter_label)
+        
+        self.log_filter_combo = QComboBox()
+        self.log_filter_combo.addItems(["Все", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+        self.log_filter_combo.setCurrentText("Все")
+        self.log_filter_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {COLOR_BG_TERTIARY};
                 color: {COLOR_TEXT_PRIMARY};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 4px;
+                padding: 4px 8px;
                 font-size: 11px;
+                min-width: 100px;
             }}
         """)
-        layout.addRow("", self.log_to_file_checkbox)
+        self.log_filter_combo.currentTextChanged.connect(self._refresh_app_logs)
+        filter_layout.addWidget(self.log_filter_combo)
 
-        # Лог в консоль
-        self.log_to_console_checkbox = QCheckBox("Выводить логи в консоль")
-        self.log_to_console_checkbox.setStyleSheet(f"""
-            QCheckBox {{
-                color: {COLOR_TEXT_PRIMARY};
-                font-size: 11px;
-            }}
-        """)
-        layout.addRow("", self.log_to_console_checkbox)
+        filter_layout.addStretch()
+        
+        # Кнопки управления
+        self.log_refresh_btn = QPushButton("🔄 Обновить")
+        self.log_refresh_btn.setStyleSheet(BUTTON_SMALL_STYLE)
+        self.log_refresh_btn.clicked.connect(self._refresh_app_logs)
+        filter_layout.addWidget(self.log_refresh_btn)
+        
+        self.log_clear_btn = QPushButton("🗑 Очистить")
+        self.log_clear_btn.setStyleSheet(BUTTON_SMALL_STYLE)
+        self.log_clear_btn.clicked.connect(self._clear_app_logs)
+        filter_layout.addWidget(self.log_clear_btn)
+        
+        self.log_save_btn = QPushButton("💾 Сохранить")
+        self.log_save_btn.setStyleSheet(BUTTON_SMALL_STYLE)
+        self.log_save_btn.clicked.connect(self._save_app_logs)
+        filter_layout.addWidget(self.log_save_btn)
+        
+        self.log_autoscroll_checkbox = QCheckBox("Автопрокрутка")
+        self.log_autoscroll_checkbox.setStyleSheet(CHECKBOX_STYLE)
+        self.log_autoscroll_checkbox.setChecked(True)
+        filter_layout.addWidget(self.log_autoscroll_checkbox)
+        
+        layout.addLayout(filter_layout)
 
-        # Описание
-        desc_label = QLabel(
-            "Уровень логирования влияет на детализацию сообщений:\n"
-            "• DEBUG — полная отладочная информация\n"
-            "• INFO — основные события приложения\n"
-            "• WARNING — предупреждения\n"
-            "• ERROR — ошибки\n"
-            "• CRITICAL — критические ошибки"
+        # --- Поле логов ---
+        self.app_log_view = QTextEdit()
+        self.app_log_view.setReadOnly(True)
+        self.app_log_view.setStyleSheet(LOG_TEXT_STYLE)
+        self.app_log_view.setMinimumHeight(250)
+        self.app_log_view.setPlaceholderText(
+            "Здесь отображаются логи приложения (app.log).\n"
+            "Нажмите 'Обновить' для загрузки.\n\n"
+            "Доступные уровни:\n"
+            "  DEBUG    — отладочная информация (серый)\n"
+            "  INFO     — основные события (белый)\n"
+            "  WARNING  — предупреждения (жёлтый)\n"
+            "  ERROR    — ошибки (красный)\n"
+            "  CRITICAL — критические ошибки (ярко-красный)"
         )
-        desc_label.setStyleSheet(f"""
-            color: {COLOR_TEXT_TERTIARY};
-            font-size: 10px;
-            padding: 10px;
-            background-color: {COLOR_BG_TERTIARY};
-            border-radius: 4px;
-        """)
-        desc_label.setWordWrap(True)
-        layout.addRow("", desc_label)
+        layout.addWidget(self.app_log_view, stretch=1)
+        
+        # --- Статус строка ---
+        self.log_status_label = QLabel("Лог-файл: app.log | Строк: 0")
+        self.log_status_label.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px;")
+        layout.addWidget(self.log_status_label)
 
         return widget
 
@@ -468,6 +633,262 @@ class SettingsDialog(QDialog):
         layout.addStretch()
         return widget
 
+    def _on_db_mode_changed(self, state):
+        """Обработка переключения режима БД."""
+        enabled = state == Qt.Checked
+        
+        # Активируем/деактивируем поля БД
+        self.db_host_input.setEnabled(enabled)
+        self.db_port_input.setEnabled(enabled)
+        self.db_user_input.setEnabled(enabled)
+        self.db_name_input.setEnabled(enabled)
+        self.db_retries_input.setEnabled(enabled)
+        self.db_retry_delay_input.setEnabled(enabled)
+        
+        if enabled:
+            self.db_status_label.setText("Будет выполнена попытка подключения при применении")
+            self.db_status_label.setStyleSheet("color: #FFD600; font-size: 10px;")
+        else:
+            self.db_status_label.setText("Файловый режим (без БД)")
+            self.db_status_label.setStyleSheet("color: #888888; font-size: 10px;")
+
+    def _start_scan(self):
+        """Запустить сканирование хранилища."""
+        path = self.storage_path_input.text().strip()
+        if not path:
+            self._append_log("Ошибка: путь к хранилищу не задан", "ERROR")
+            return
+        
+        root_path = Path(path)
+        if not root_path.exists():
+            self._append_log(f"Ошибка: каталог не существует: {path}", "ERROR")
+            return
+        
+        # Очищаем лог
+        self.scan_log.clear()
+        self.save_log_btn.setEnabled(False)
+        
+        # UI в режим сканирования
+        self.scan_btn.setEnabled(False)
+        self.scan_cancel_btn.setEnabled(True)
+        self.scan_progress.setVisible(True)
+        self.scan_progress.setRange(0, 0)  # Бесконечный
+        
+        # Запускаем worker
+        self._scan_worker = ScanWorker(root_path, self)
+        self._scan_worker.log_message.connect(self._append_log_html)
+        self._scan_worker.progress.connect(self._on_scan_progress)
+        self._scan_worker.finished_scan.connect(self._on_scan_finished)
+        self._scan_worker.error.connect(self._on_scan_error)
+        self._scan_worker.start()
+
+    def _cancel_scan(self):
+        """Отменить сканирование."""
+        if self._scan_worker and self._scan_worker.isRunning():
+            self._scan_worker.cancel()
+            self._append_log("Отмена сканирования...", "WARNING")
+
+    def _on_scan_progress(self, current: int, total: int):
+        """Обновить прогресс сканирования."""
+        if total > 0:
+            self.scan_progress.setRange(0, total)
+            self.scan_progress.setValue(current)
+        else:
+            self.scan_progress.setRange(0, 0)
+
+    def _on_scan_finished(self, total: int, processed: int, errors: int):
+        """Обработка завершения сканирования."""
+        self.scan_btn.setEnabled(True)
+        self.scan_cancel_btn.setEnabled(False)
+        self.scan_progress.setVisible(False)
+        self.save_log_btn.setEnabled(True)
+        
+        self._append_log(
+            f"Сканирование завершено. Всего: {total}, обработано: {processed}, ошибок: {errors}",
+            "SUCCESS"
+        )
+
+    def _on_scan_error(self, error_msg: str):
+        """Обработка ошибки сканирования."""
+        self._append_log(error_msg, "ERROR")
+
+    def _append_log(self, message: str, level: str = "INFO"):
+        """Добавить сообщение в лог."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        colors = {
+            "INFO": "#BBBBBB",
+            "SUCCESS": "#00C853",
+            "WARNING": "#FFD600",
+            "ERROR": "#DD2C00"
+        }
+        color = colors.get(level, "#BBBBBB")
+        html = f'<span style="color:#666666;">[{timestamp}]</span> <span style="color:{color};">{message}</span><br>'
+        self.scan_log.append(html)
+        # Автопрокрутка
+        scrollbar = self.scan_log.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+    def _append_log_html(self, html: str):
+        """Добавить HTML в лог."""
+        self.scan_log.append(html)
+        scrollbar = self.scan_log.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+    def _save_scan_log(self):
+        """Сохранить лог сканирования в файл."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить лог", "scan_log.txt", "Текстовые файлы (*.txt)"
+        )
+        if path:
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(self.scan_log.toPlainText())
+                self._append_log(f"Лог сохранён: {path}", "SUCCESS")
+            except Exception as e:
+                self._append_log(f"Ошибка сохранения лога: {e}", "ERROR")
+
+    def _browse_storage_path(self):
+        """Выбрать путь к хранилищу."""
+        path = QFileDialog.getExistingDirectory(
+            self, "Выберите папку с архивами",
+            self.storage_path_input.text() or ""
+        )
+        if path:
+            self.storage_path_input.setText(path)
+
+    def _get_log_file_path(self) -> Path:
+        """Получить путь к файлу логов."""
+        return Path(__file__).resolve().parent.parent.parent / "app.log"
+
+    def _refresh_app_logs(self):
+        """Обновить отображение логов приложения."""
+        log_path = self._get_log_file_path()
+        
+        if not log_path.exists():
+            self.app_log_view.setHtml(
+                '<span style="color:#888888;">Лог-файл app.log ещё не создан. '
+                'Запустите какие-либо операции для генерации логов.</span>'
+            )
+            self.log_status_label.setText("Лог-файл: app.log | Не найден")
+            return
+        
+        try:
+            # Читаем последние 500 строк
+            with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+            
+            # Ограничиваем размер (последние 500 строк)
+            if len(lines) > 500:
+                lines = lines[-500:]
+            
+            filter_level = self.log_filter_combo.currentText()
+            
+            # Форматируем с цветами
+            formatted_lines = []
+            visible_count = 0
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Определяем уровень из строки лога
+                level = "INFO"
+                if " - DEBUG - " in line:
+                    level = "DEBUG"
+                elif " - INFO - " in line:
+                    level = "INFO"
+                elif " - WARNING - " in line:
+                    level = "WARNING"
+                elif " - ERROR - " in line:
+                    level = "ERROR"
+                elif " - CRITICAL - " in line:
+                    level = "CRITICAL"
+                
+                # Фильтрация по уровню
+                if filter_level != "Все" and level != filter_level:
+                    continue
+                
+                visible_count += 1
+                
+                # Цвета для уровней
+                colors = {
+                    "DEBUG": "#888888",
+                    "INFO": "#CCCCCC",
+                    "WARNING": "#FFD600",
+                    "ERROR": "#FF6D00",
+                    "CRITICAL": "#DD2C00"
+                }
+                color = colors.get(level, "#CCCCCC")
+                
+                # Форматируем строку
+                parts = line.split(" - ", 3)
+                if len(parts) >= 4:
+                    timestamp, module, lvl, message = parts
+                    html = (
+                        f'<span style="color:#555555;">{timestamp}</span> | '
+                        f'<span style="color:#448AFF;">{module}</span> | '
+                        f'<span style="color:{color}; font-weight:bold;">{lvl}</span> | '
+                        f'<span style="color:{color};">{message}</span><br>'
+                    )
+                else:
+                    html = f'<span style="color:{color};">{line}</span><br>'
+                
+                formatted_lines.append(html)
+            
+            if formatted_lines:
+                self.app_log_view.setHtml(''.join(formatted_lines))
+                self.log_status_label.setText(f"Лог-файл: app.log | Строк: {visible_count} (из {len(lines)})")
+            else:
+                self.app_log_view.setHtml(
+                    f'<span style="color:#888888;">Нет логов уровня {filter_level}. '
+                    f'Выберите другой фильтр или измените уровень логирования в настройках.</span>'
+                )
+                self.log_status_label.setText(f"Лог-файл: app.log | Строк: 0")
+            
+            # Автопрокрутка
+            if self.log_autoscroll_checkbox.isChecked():
+                scrollbar = self.app_log_view.verticalScrollBar()
+                scrollbar.setValue(scrollbar.maximum())
+                
+        except Exception as e:
+            self.app_log_view.setHtml(
+                f'<span style="color:#DD2C00;">Ошибка чтения лога: {e}</span>'
+            )
+            self.log_status_label.setText("Ошибка чтения лога")
+
+    def _clear_app_logs(self):
+        """Очистить отображение логов."""
+        self.app_log_view.clear()
+        self.log_status_label.setText("Лог очищен (отображение)")
+
+    def _save_app_logs(self):
+        """Сохранить логи в файл."""
+        log_path = self._get_log_file_path()
+        
+        if not log_path.exists():
+            self._append_log("Лог-файл не найден", "ERROR")
+            return
+        
+        save_path, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить логи", "application_logs.txt", "Текстовые файлы (*.txt)"
+        )
+        if save_path:
+            try:
+                # Копируем содержимое
+                with open(log_path, 'r', encoding='utf-8', errors='replace') as src:
+                    content = src.read()
+                
+                with open(save_path, 'w', encoding='utf-8') as dst:
+                    dst.write(content)
+                
+                self._append_log(f"Логи сохранены: {save_path}", "SUCCESS")
+                show_info(self, "Логи сохранены", f"Файл:\n{save_path}")
+                
+            except Exception as e:
+                self._append_log(f"Ошибка сохранения логов: {e}", "ERROR")
+                show_critical(self, "Ошибка", f"Не удалось сохранить логи:\n{e}")
+
     def _check_modules(self):
         """Проверить статус критических модулей."""
         # Очищаем старые индикаторы
@@ -492,11 +913,8 @@ class SettingsDialog(QDialog):
         # Проверяем каждый модуль
         for name, desc, is_critical in modules:
             indicator = ModuleStatusIndicator(name, desc, is_critical)
-            
-            # Проверяем доступность
             ok = self._check_module(name)
             indicator.set_status(ok)
-            
             self.modules_layout.addWidget(indicator)
 
     def _check_module(self, name: str) -> bool:
@@ -515,8 +933,7 @@ class SettingsDialog(QDialog):
                 import pyqtgraph
                 return True
             elif name == "PostgreSQL":
-                # Проверяем подключение к БД
-                return settings.use_database
+                return self.repository_switcher and self.repository_switcher.mode == 'postgres'
             elif name == "asyncpg":
                 import asyncpg
                 return True
@@ -531,17 +948,7 @@ class SettingsDialog(QDialog):
                 return True
         except ImportError:
             return False
-        
         return False
-
-    def _browse_storage_path(self):
-        """Выбрать путь к хранилищу."""
-        path = QFileDialog.getExistingDirectory(
-            self, "Выберите папку с архивами",
-            self.storage_path_input.text() or ""
-        )
-        if path:
-            self.storage_path_input.setText(path)
 
     def _load_settings(self):
         """Загрузить текущие настройки."""
@@ -553,6 +960,9 @@ class SettingsDialog(QDialog):
         self.db_retries_input.setValue(settings.db_connect_retries)
         self.db_retry_delay_input.setValue(settings.db_connect_retry_delay)
         self.db_enabled_checkbox.setChecked(settings.use_database)
+        
+        # Обновляем статус
+        self._on_db_mode_changed(Qt.Checked if settings.use_database else Qt.Unchecked)
 
         # Хранилище
         self.storage_path_input.setText(str(settings.archive_storage_path))
@@ -563,13 +973,14 @@ class SettingsDialog(QDialog):
         if index >= 0:
             self.log_level_combo.setCurrentIndex(index)
         
-        # Проверяем, включено ли логирование в файл/консоль
-        # (это можно определить по наличию хендлеров в логгере)
         self.log_to_file_checkbox.setChecked(True)
         self.log_to_console_checkbox.setChecked(True)
 
-    def _save_settings(self):
-        """Сохранить настройки."""
+        # Загружаем логи приложения
+        self._refresh_app_logs()
+
+    def _apply_settings(self):
+        """Применить настройки (без перезапуска)."""
         try:
             # Собираем новые настройки
             new_settings = {
@@ -589,11 +1000,9 @@ class SettingsDialog(QDialog):
             env_path = Path(__file__).resolve().parent.parent.parent / ".env"
             
             if env_path.exists():
-                # Читаем текущий .env
                 with open(env_path, 'r', encoding='utf-8') as f:
                     lines = f.readlines()
 
-                # Обновляем значения
                 updated_lines = []
                 for line in lines:
                     if '=' in line and not line.strip().startswith('#'):
@@ -604,7 +1013,6 @@ class SettingsDialog(QDialog):
                             continue
                     updated_lines.append(line)
 
-                # Записываем обновлённый .env
                 with open(env_path, 'w', encoding='utf-8') as f:
                     f.writelines(updated_lines)
 
@@ -612,17 +1020,91 @@ class SettingsDialog(QDialog):
             from ..dal.config import Settings
             settings.__init__()
 
+            # Динамически переключаем репозиторий
+            if self.repository_switcher:
+                self.repository_switcher.switch_mode(settings.use_database)
+
             # Сигнализируем об изменении
             self.settings_changed.emit()
-
-            # Показываем сообщение
-            from .styled_message_box import show_info
-            show_info(self, "Настройки сохранены", 
-                     "Изменения вступят в силу после перезапуска приложения.")
 
             self.accept()
 
         except Exception as e:
             from .styled_message_box import show_critical
-            show_critical(self, "Ошибка сохранения", 
-                         f"Не удалось сохранить настройки:\n{str(e)}")
+            show_critical(self, "Ошибка применения", 
+                         f"Не удалось применить настройки:\n{str(e)}")
+
+
+class ModuleStatusIndicator(QFrame):
+    """Индикатор статуса модуля."""
+
+    def __init__(self, name: str, description: str, is_critical: bool = False, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(60)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLOR_BG_TERTIARY};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 4px;
+            }}
+        """)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(10)
+
+        # Индикатор (кружок)
+        self.status_dot = QFrame()
+        self.status_dot.setFixedSize(16, 16)
+        self.status_dot.setStyleSheet(f"""
+            QFrame {{
+                background-color: #00C853;
+                border-radius: 8px;
+            }}
+        """)
+        layout.addWidget(self.status_dot)
+
+        # Информация
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+
+        name_label = QLabel(name)
+        name_label.setStyleSheet(f"""
+            color: {COLOR_TEXT_PRIMARY};
+            font-size: 12px;
+            font-weight: bold;
+        """)
+        info_layout.addWidget(name_label)
+
+        desc_label = QLabel(description)
+        desc_label.setStyleSheet(f"""
+            color: {COLOR_TEXT_TERTIARY};
+            font-size: 10px;
+        """)
+        desc_label.setWordWrap(True)
+        info_layout.addWidget(desc_label)
+
+        layout.addLayout(info_layout, stretch=1)
+
+        # Критичность
+        if is_critical:
+            crit_label = QLabel("КРИТИЧНЫЙ")
+            crit_label.setStyleSheet("""
+                color: #DD2C00;
+                font-size: 9px;
+                font-weight: bold;
+                padding: 2px 6px;
+                background-color: rgba(221, 44, 0, 0.2);
+                border-radius: 2px;
+            """)
+            layout.addWidget(crit_label)
+
+    def set_status(self, ok: bool):
+        """Установить статус модуля."""
+        color = "#00C853" if ok else "#DD2C00"
+        self.status_dot.setStyleSheet(f"""
+            QFrame {{
+                background-color: {color};
+                border-radius: 8px;
+            }}
+        """)

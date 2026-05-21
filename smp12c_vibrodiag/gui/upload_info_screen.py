@@ -58,7 +58,7 @@ class UploadInfoScreen(QWidget):
         
         # Заголовок
         title_label = QLabel("ИНФОРМАЦИЯ О ЗАГРУЗКЕ")
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet(f"""
             font-size: 22px;
             font-weight: bold;

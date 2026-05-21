@@ -47,15 +47,15 @@ class ZoneIndicator(QFrame):
 
         self.title_label = QLabel(title)
         self.title_label.setStyleSheet(f'color: {COLOR_TEXT_SECONDARY}; font-size: 10px;')
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.zone_label = QLabel('-')
         self.zone_label.setStyleSheet(f'color: {COLOR_TEXT_PRIMARY}; font-size: 24px; font-weight: bold;')
-        self.zone_label.setAlignment(Qt.AlignCenter)
+        self.zone_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.rms_label = QLabel('—')
         self.rms_label.setStyleSheet(f'color: {COLOR_TEXT_TERTIARY}; font-size: 9px;')
-        self.rms_label.setAlignment(Qt.AlignCenter)
+        self.rms_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout.addWidget(self.title_label)
         layout.addWidget(self.zone_label)
@@ -86,7 +86,7 @@ class SensorStatusIndicator(QFrame):
         super().__init__(parent)
         self.sensor_id = sensor_id
         self.setFixedSize(80, 90)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.selected = False
 
         # Базовый стиль
@@ -122,7 +122,7 @@ class SensorStatusIndicator(QFrame):
                     font-size: 8px;
                 }}
             """)
-            sec.setAlignment(Qt.AlignCenter)
+            sec.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(sec)
             self.sections[section_name] = sec
 
@@ -483,26 +483,26 @@ class AnalysisDataScreen(QWidget):
 
             # Пик №
             item0 = QTableWidgetItem(f"{row_idx + 1}")
-            item0.setTextAlignment(Qt.AlignCenter)
+            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             item0.setForeground(QColor(COLOR_TEXT_PRIMARY))
             self.harmonics_table.setItem(row_idx, 0, item0)
 
             # Тип сигнала
             item1 = QTableWidgetItem(peak['signal_type'])
-            item1.setTextAlignment(Qt.AlignCenter)
+            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             item1.setForeground(QColor(COLOR_TEXT_SECONDARY))
             self.harmonics_table.setItem(row_idx, 1, item1)
 
             # Частота
             item2 = QTableWidgetItem(f"{peak['frequency']:.2f}")
-            item2.setTextAlignment(Qt.AlignCenter)
+            item2.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             item2.setForeground(QColor(COLOR_TEXT_PRIMARY))
             self.harmonics_table.setItem(row_idx, 2, item2)
 
             # Амплитуда + зона
             zone_color = ZONE_COLORS.get(peak['zone'], COLOR_TEXT_TERTIARY)
             item3 = QTableWidgetItem(f"{peak['amplitude']:.4f} {peak['unit']}")
-            item3.setTextAlignment(Qt.AlignCenter)
+            item3.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             item3.setForeground(QColor(zone_color))
             self.harmonics_table.setItem(row_idx, 3, item3)
 

@@ -150,13 +150,13 @@ class RawDataCanvas(QWidget):
         """Отрисовка графика."""
         try:
             painter = QPainter(self)
-            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             painter.fillRect(self.rect(), QColor(COLOR_BG_DARK))
 
             if len(self.time_data) == 0 or len(self.signal_data) == 0:
                 painter.setPen(QColor(COLOR_TEXT_PRIMARY))
-                painter.setFont(QFont(FONT_FAMILY_MONO, 12, QFont.Bold))
-                painter.drawText(self.rect(), Qt.AlignCenter, f'Нет данных\nдля датчика {self.sensor_id}')
+                painter.setFont(QFont(FONT_FAMILY_MONO, 12, QFont.Weight.Bold))
+                painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Нет данных\nдля датчика {self.sensor_id}')
                 return
 
             # Децимация для производительности
@@ -226,7 +226,7 @@ class RawDataCanvas(QWidget):
 
             # Заголовок
             painter.setPen(QColor(COLOR_TEXT_PRIMARY))
-            painter.setFont(QFont(FONT_FAMILY_MONO, 10, QFont.Bold))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 10, QFont.Weight.Bold))
             painter.drawText(m, 20, f'Датчик {self.sensor_id} — {self.sensor_name}')
 
             # Подписи осей
@@ -242,7 +242,7 @@ class RawDataCanvas(QWidget):
             painter = QPainter(self)
             painter.setPen(QColor(COLOR_TEXT_PRIMARY))
             painter.setFont(QFont(FONT_FAMILY_MONO, 10))
-            painter.drawText(self.rect(), Qt.AlignCenter, f'Ошибка отрисовки:\n{str(e)}')
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Ошибка отрисовки:\n{str(e)}')
 
 
 class SensorSelector(QFrame):

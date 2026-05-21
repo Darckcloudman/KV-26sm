@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
     QDialog, QLineEdit, QCheckBox
 )
 from PySide6.QtCore import Qt, QThread, Signal, QRect, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
-from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette
+from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette, QConicalGradient
 
 
 class LoadingSpinner(QWidget):
@@ -53,7 +53,7 @@ class LoadingSpinner(QWidget):
         self._animation.setDuration(1000)  # 1 секунда на оборот (плавнее)
         self._animation.setStartValue(0)
         self._animation.setEndValue(360)
-        self._animation.setEasingCurve(QEasingCurve.Linear)  # Плавное линейное вращение
+        self._animation.setEasingCurve(QEasingCurve.Type.Linear)  # Плавное линейное вращение
         self._animation.setLoopCount(-1)  # Бесконечно
         self._animation.valueChanged.connect(self._on_angle_changed)
         
@@ -228,13 +228,13 @@ class SensorIndicator(QWidget):
         self.selected = False
         self._glow = 1.0
         self.setFixedSize(26, 26)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self._animation = QVariantAnimation(self)
         self._animation.setStartValue(0.0)
         self._animation.setEndValue(1.0)
         self._animation.setDuration(1200)
-        self._animation.setEasingCurve(QEasingCurve.InOutSine)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutSine)
         self._animation.valueChanged.connect(self._on_glow_changed)
         self._animation.finished.connect(self._on_animation_finished)
 
@@ -243,10 +243,10 @@ class SensorIndicator(QWidget):
         self.update()
 
     def _on_animation_finished(self):
-        if self._animation.direction() == QAbstractAnimation.Forward:
-            self._animation.setDirection(QAbstractAnimation.Backward)
+        if self._animation.direction() == QAbstractAnimation.Direction.Forward:
+            self._animation.setDirection(QAbstractAnimation.Direction.Backward)
         else:
-            self._animation.setDirection(QAbstractAnimation.Forward)
+            self._animation.setDirection(QAbstractAnimation.Direction.Forward)
         self._animation.start()
 
     @staticmethod
@@ -265,7 +265,7 @@ class SensorIndicator(QWidget):
         """
         self.status = status
         if status in ('ok', 'partial'):
-            if self._animation.state() != QAbstractAnimation.Running:
+            if self._animation.state() != QAbstractAnimation.State.Running:
                 self._animation.start()
         else:
             self._animation.stop()
@@ -286,7 +286,7 @@ class SensorIndicator(QWidget):
           none    → красная рамка, белый центр, белый номер
         """
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = 11
         cx, cy = 13, 13
 
@@ -316,14 +316,14 @@ class SensorIndicator(QWidget):
         painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
 
         painter.setPen(QPen(text_color))
-        font = QFont("Arial", 9, QFont.Bold)
+        font = QFont("Arial", 9, QFont.Weight.Bold)
         painter.setFont(font)
         text_rect = QRect(cx - r, cy - r, r * 2, r * 2)
-        painter.drawText(text_rect, Qt.AlignCenter, str(self.sensor_id))
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, str(self.sensor_id))
 
         if self.selected:
             painter.setPen(QPen(QColor("#FFFFFF"), 2))
-            painter.setBrush(Qt.NoBrush)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(cx - r - 2, cy - r - 2, (r + 2) * 2, (r + 2) * 2)
 
     def mousePressEvent(self, event):
@@ -386,7 +386,7 @@ class SensorScheme(QFrame):
             return
 
         w, h = self.width(), self.height()
-        self._scaled_pixmap = self._pixmap.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self._scaled_pixmap = self._pixmap.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._pixmap_x = (w - self._scaled_pixmap.width()) // 2
         self._pixmap_y = (h - self._scaled_pixmap.height()) // 2
         self._scale = self._scaled_pixmap.width() / self._pixmap.width()
@@ -465,7 +465,7 @@ class HomeScreen(QWidget):
         # Заголовок
         title = QLabel("WTG Vibrodiag Analizer")
         title.setStyleSheet("color: #FFFFFF; font-size: 22px; font-weight: bold; background: transparent;")
-        title.setAlignment(Qt.AlignCenter)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title)
 
         # Кнопки + путь
@@ -685,7 +685,7 @@ class HomeScreen(QWidget):
         scheme_wrapper = QHBoxLayout()
         self.scheme = SensorScheme()
         self.scheme.sensor_clicked.connect(self._on_sensor_clicked)
-        scheme_wrapper.addWidget(self.scheme, alignment=Qt.AlignTop)
+        scheme_wrapper.addWidget(self.scheme, alignment=Qt.AlignmentFlag.AlignTop)
         scheme_wrapper.addStretch()
         right_layout.addLayout(scheme_wrapper, 2)
 
@@ -706,16 +706,16 @@ class HomeScreen(QWidget):
 
             num_label = QLabel(f"{sensor_id}.")
             num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
-            status_layout.addWidget(num_label, i, 0, alignment=Qt.AlignTop)
+            status_layout.addWidget(num_label, i, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
             desc_label = QLabel(desc)
             desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
-            status_layout.addWidget(desc_label, i, 1, alignment=Qt.AlignTop)
+            status_layout.addWidget(desc_label, i, 1, alignment=Qt.AlignmentFlag.AlignTop)
 
             status_label = QLabel("[нет данных]")
             status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
-            status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignTop)
+            status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignmentFlag.AlignTop)
 
             self.status_labels[sensor_id] = status_label
 
@@ -749,12 +749,12 @@ class HomeScreen(QWidget):
         """)
         self.analyze_btn.setEnabled(False)
         self.analyze_btn.clicked.connect(self._analyze)
-        main_layout.addWidget(self.analyze_btn, alignment=Qt.AlignCenter)
+        main_layout.addWidget(self.analyze_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Версия и режим работы
         version_label = QLabel("v1.3 | A.Telezhenko, 2026")
         version_label.setStyleSheet("color: #444444; font-size: 9px; background: transparent;")
-        version_label.setAlignment(Qt.AlignCenter)
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(version_label)
 
         # Индикатор режима хранения (добавлено в v1.3)
@@ -762,9 +762,13 @@ class HomeScreen(QWidget):
         mode_text = "PostgreSQL" if settings.use_database else "Файловая система"
         mode_label = QLabel(f"Режим хранения данных: {mode_text}")
         mode_label.setStyleSheet("color: #555555; font-size: 9px; background: transparent;")
-        mode_label.setAlignment(Qt.AlignCenter)
+        mode_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(mode_label)
 
+    def set_repository(self, repository):
+        """Установить новый репозиторий (при динамическом переключении)."""
+        self.repository = repository
+        
     def _select_directory(self):
         """Выбрать каталог с архивами и сохранить путь."""
         try:
@@ -841,8 +845,8 @@ class HomeScreen(QWidget):
             # Ничего не найдено
             self.archive_table.insertRow(0)
             no_result = QTableWidgetItem("Ничего не найдено")
-            no_result.setFlags(Qt.ItemIsEnabled)
-            no_result.setTextAlignment(Qt.AlignCenter)
+            no_result.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            no_result.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             no_result.setForeground(QColor("#888888"))
             self.archive_table.setItem(0, 0, no_result)
             self.archive_table.setSpan(0, 0, 1, 3)
@@ -851,7 +855,7 @@ class HomeScreen(QWidget):
         for row_idx, archive in enumerate(filtered):
             self.archive_table.insertRow(row_idx)
             item0 = QTableWidgetItem(archive['turbine'])
-            item0.setData(Qt.UserRole, archive['path'])
+            item0.setData(Qt.ItemDataRole.UserRole, archive['path'])
             self.archive_table.setItem(row_idx, 0, item0)
             self.archive_table.setItem(row_idx, 1, QTableWidgetItem(archive['date_str']))
             self.archive_table.setItem(row_idx, 2, QTableWidgetItem(archive['size']))
@@ -900,7 +904,7 @@ class HomeScreen(QWidget):
         item = self.archive_table.item(row, 0)
         if item is None:
             return
-        file_path = item.data(Qt.UserRole)
+        file_path = item.data(Qt.ItemDataRole.UserRole)
         if file_path and Path(file_path).exists():
             self._parse_archive(file_path)
 

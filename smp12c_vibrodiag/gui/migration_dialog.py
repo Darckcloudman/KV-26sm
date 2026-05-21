@@ -145,7 +145,7 @@ class MigrationDialog(QDialog):
         
         # Заголовок
         self.title_label = QLabel("Инициализация базы данных...")
-        self.title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.title_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         layout.addWidget(self.title_label)
         
         # Описание текущего шага

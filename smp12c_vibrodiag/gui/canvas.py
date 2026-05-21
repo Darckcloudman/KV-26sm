@@ -59,13 +59,13 @@ class MplCanvas(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), QColor('#000000'))
 
         if len(self.frequencies) == 0:
             painter.setPen(QColor('#666666'))
             painter.setFont(QFont('Consolas', 11))
-            painter.drawText(self.rect(), Qt.AlignCenter, 'Загрузите данные для анализа')
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, 'Загрузите данные для анализа')
             return
 
         w, h = self.width(), self.height()
@@ -109,7 +109,7 @@ class MplCanvas(QWidget):
 
         # Заголовок
         painter.setPen(QColor('#e0e0e0'))
-        painter.setFont(QFont('Consolas', 10, QFont.Bold))
+        painter.setFont(QFont('Consolas', 10, QFont.Weight.Bold))
         painter.drawText(margin, 20, 'Спектр | Зона %s | СКЗ: %.3f мм/с' % (self.zone, self.rms))
 
         # Метки осей

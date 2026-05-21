@@ -3,12 +3,19 @@
 Модель архивной записи.
 """
 
-from typing import Optional
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 from sqlalchemy import String, DateTime, Integer, Float, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .turbine import Turbine
+    from .sensor_data import SensorData
+    from .analysis_cache import AnalysisCache
 
 
 class Archive(Base):

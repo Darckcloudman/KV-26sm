@@ -22,6 +22,7 @@ def main():
     
     # Создание приложения
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")  # Принудительно используем Fusion стиль для консистентности
     app.setApplicationName('SMP12C VibroDiag Analyzer')
     app.setApplicationVersion('1.3')
     app.setOrganizationName('SMP12C')

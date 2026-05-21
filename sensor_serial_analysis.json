@@ -1,0 +1,25 @@
+{
+  "total_files": 24,
+  "total_processed": 24,
+  "total_errors": 0,
+  "unique_serials": 1,
+  "global_duplicates": 1,
+  "same_sensor_total": 8,
+  "same_sensor_duplicates": 0,
+  "sensor_filter_total": 24,
+  "sensor_filter_duplicates": 0,
+  "duplicate_distribution": {
+    "24": 1
+  },
+  "top_duplicates": [
+    {
+      "serial": "38408",
+      "count": 24,
+      "files": [
+        "test_data\\W1436 WTG37 SMP_20250901_38408_SENSOR_01_FILTER_W.rd2",
+        "test_data\\W1436 WTG37 SMP_20250901_38408_SENSOR_01_HIGH_W.rd2",
+        "test_data\\W1436 WTG37 SMP_20250901_38408_SENSOR_01_LOW_W.rd2"
+      ]
+    }
+  ]
+}

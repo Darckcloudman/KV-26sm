@@ -98,7 +98,7 @@ class TrendsScreen(QWidget):
             border: 1px solid {COLOR_BORDER};
             border-radius: 5px;
         """)
-        self.file_mode_warning.setAlignment(Qt.AlignCenter)
+        self.file_mode_warning.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.file_mode_warning.setVisible(not settings.use_database)
         main_layout.addWidget(self.file_mode_warning)
 

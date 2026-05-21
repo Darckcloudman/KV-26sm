@@ -338,6 +338,48 @@ STATUSBAR_ICON_STYLE = f"""
     }}
 """
 
+# Чек-боксы (белый фон, чёрная галочка, уменьшенный размер)
+CHECKBOX_STYLE = f"""
+    QCheckBox {{
+        spacing: 4px;
+        color: {COLOR_TEXT_PRIMARY};
+        font-size: 10px;
+    }}
+    QCheckBox::indicator {{
+        width: 6px;
+        height: 6px;
+        border: 1px solid #555555;
+        background-color: #FFFFFF;
+        border-radius: 2px;
+    }}
+    QCheckBox::indicator:checked {{
+        background-color: #000000;
+        border: 1px solid #000000;
+        image: none;
+    }}
+    QCheckBox::indicator:hover {{
+        border: 1px solid #888888;
+    }}
+    QCheckBox::indicator:disabled {{
+        background-color: #333333;
+        border: 1px solid #444444;
+    }}
+"""
+
+# Лог-поле (QTextEdit для вывода логов сканирования)
+LOG_TEXT_STYLE = f"""
+    QTextEdit, QPlainTextEdit {{
+        background-color: #0A0A0A;
+        color: #CCCCCC;
+        border: 1px solid {COLOR_BORDER};
+        border-radius: 4px;
+        padding: 8px;
+        font-family: {FONT_FAMILY_MONO};
+        font-size: 10px;
+        line-height: 1.4;
+    }}
+"""
+
 
 # === УТИЛИТЫ ===
 

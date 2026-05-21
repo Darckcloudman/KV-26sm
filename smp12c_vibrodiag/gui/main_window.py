@@ -32,6 +32,7 @@ from .styled_message_box import show_about, show_question, show_info, show_warni
 # from .styles import STYLESHEET  # Убрал для чёрно-белой темы
 from ..parsers.rd2_parser import MultiSensorRD2Parser
 from ..dal.repositories import get_repository
+from ..dal.repository_switcher import RepositorySwitcher
 from ..dal.config import settings
 from ..dal.logger import get_logger
 from ..dal.persistence_service import DataPersistenceService
@@ -58,14 +59,28 @@ class MainWindow(QMainWindow):
         self.current_file = None
         self.parser = None
 
-        # Инициализация репозитория (инъекция зависимости)
-        self.repository = get_repository(settings)
+        # Инициализация переключателя репозитория (динамическое переключение)
+        self.repository_switcher = RepositorySwitcher(settings)
+        self.repository_switcher.connection_success.connect(self._on_connection_success)
+        self.repository_switcher.connection_failed.connect(self._on_connection_failed)
+        self.repository_switcher.mode_changed.connect(self._on_mode_changed)
+        
+        # Инициализация репозитория через переключатель
+        self.repository = self.repository_switcher.initialize()
 
         # Инициализация сервиса сохранения данных (только для БД-режима)
         self.persistence_service = None
         self.auto_scan_service = None
         
-        if settings.use_database:
+        self._init_db_services()
+
+        self.setup_ui()
+        self.setup_menu()
+        self.apply_styles()
+
+    def _init_db_services(self):
+        """Инициализировать сервисы БД (если режим PostgreSQL)."""
+        if self.repository_switcher.mode == 'postgres':
             try:
                 from ..dal.repositories.postgres import PostgresRepository
                 if isinstance(self.repository, PostgresRepository):
@@ -79,22 +94,16 @@ class MainWindow(QMainWindow):
                     logger.info("DataPersistenceService и AutoScanService инициализированы")
             except Exception as e:
                 logger.error("Ошибка инициализации сервисов сохранения: %s", e)
-
-        # Если используется БД и репозиторий — файловый (fallback),
-        # значит PostgreSQL недоступен — показываем предупреждение
-        if settings.use_database and hasattr(self.repository, 'archive_storage_path'):
-            from .styled_message_box import show_warning
-            show_warning(
-                self,
-                "Режим файловой системы",
-                "Не удалось соединиться с базой данных. "
-                "Приложение работает в файловом режиме. "
-                "Проверьте параметры подключения в .env файле."
-            )
-
-        self.setup_ui()
-        self.setup_menu()
-        self.apply_styles()
+        else:
+            # Файловый режим — показываем предупреждение если БД была запрошена
+            if settings.use_database:
+                show_warning(
+                    self,
+                    "Режим файловой системы",
+                    "Не удалось соединиться с базой данных. "
+                    "Приложение работает в файловом режиме. "
+                    "Проверьте параметры подключения в настройках."
+                )
 
     def setup_ui(self):
         """Настроить интерфейс."""
@@ -180,7 +189,7 @@ class MainWindow(QMainWindow):
         
         # Иконка состояния (слева) — только иконка из QtAwesome
         self.status_icon = QLabel()
-        self.status_icon.setAlignment(Qt.AlignCenter)
+        self.status_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_icon.setStyleSheet(STATUSBAR_ICON_STYLE)
         self._update_status_icon("ready")  # Иконка готовности
         self.status_bar.addPermanentWidget(self.status_icon, stretch=0)
@@ -198,6 +207,12 @@ class MainWindow(QMainWindow):
         self.time_label.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px; padding: 0px 8px;")
         self.status_bar.addPermanentWidget(self.time_label, stretch=0)
         
+        # Индикатор режима (PostgreSQL / Файловый)
+        self.mode_indicator = QLabel()
+        self.mode_indicator.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px; padding: 0px 8px;")
+        self.status_bar.addPermanentWidget(self.mode_indicator, stretch=0)
+        self._update_mode_indicator()
+        
         # Таймер для обновления времени
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update_time)
@@ -205,7 +220,7 @@ class MainWindow(QMainWindow):
         self._update_time()
 
         # Инициализация иконки статуса
-        self._update_status_icon('db' if settings.use_database else 'file')
+        self._update_status_icon('db' if self.repository_switcher.mode == 'postgres' else 'file')
 
     def _on_upload_info_requested(self, parser):
         """Перейти на экран информации о загрузке."""
@@ -472,22 +487,67 @@ class MainWindow(QMainWindow):
             f"<p><b>Стандарты:</b> ISO 10816-21:2015, ГОСТ 10816-21-2021</p>"
         )
 
+    def _on_connection_success(self, info: str):
+        """Обработка успешного подключения."""
+        logger.info(info)
+        self._update_mode_indicator()
+
+    def _on_connection_failed(self, error: str):
+        """Обработка ошибки подключения."""
+        logger.error(error)
+        show_warning(self, "Ошибка подключения", error)
+        self._update_mode_indicator()
+
+    def _on_mode_changed(self, mode: str):
+        """Обработка смены режима."""
+        self._update_status_icon('db' if mode == 'postgres' else 'file')
+        self._update_mode_indicator()
+        
+        # Пересоздаём сервисы
+        self.persistence_service = None
+        self.auto_scan_service = None
+        if mode == 'postgres':
+            self._init_db_services()
+        
+        # Обновляем HomeScreen
+        self.home_screen.set_repository(self.repository_switcher.repository)
+        self.home_screen.persistence_service = self.persistence_service
+        self.home_screen.auto_scan_service = self.auto_scan_service
+        
+        # Обновляем TrendsScreen
+        self.trends_screen.repository = self.repository_switcher.repository
+        
+        # Обновляем UploadInfoScreen
+        self.upload_info_screen.repository = self.repository_switcher.repository
+
+    def _update_mode_indicator(self):
+        """Обновить индикатор режима в статус-баре."""
+        info = self.repository_switcher.get_repository_info()
+        if info['mode'] == 'postgres':
+            text = f"Режим: PostgreSQL ({info.get('host', 'localhost')})"
+            color = "#448AFF"
+        else:
+            text = "Режим: Файловая система"
+            color = "#888888"
+        
+        self.mode_indicator.setText(text)
+        self.mode_indicator.setStyleSheet(
+            f"color: {color}; font-size: 10px; padding: 0px 8px;"
+        )
+
     def _open_settings(self):
         """Открыть диалог настроек."""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self, repository_switcher=self.repository_switcher)
         dialog.settings_changed.connect(self._on_settings_changed)
         dialog.exec()
 
     def _on_settings_changed(self):
-        """Обработчик изменения настроек."""
-        # Обновляем иконку статус-бара
-        self._update_status_icon('db' if settings.use_database else 'file')
-
-        # Показываем предупреждение о перезапуске
+        """Обработчик изменения настроек (динамическое применение)."""
+        self._update_mode_indicator()
         show_info(
             self,
-            "Настройки обновлены",
-            "Для применения некоторых настроек требуется перезапуск приложения."
+            "Настройки применены",
+            "Изменения настроек применены."
         )
 
     def _update_time(self):
