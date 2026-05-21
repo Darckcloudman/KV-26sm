@@ -359,7 +359,7 @@ class RawDataScreen(QWidget):
         zoom_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 11px;")
         zoom_layout.addWidget(zoom_label)
         
-        self.zoom_slider = QSlider(Qt.Horizontal)
+        self.zoom_slider = QSlider(Qt.Orientation.Horizontal)
         self.zoom_slider.setMinimum(1)
         self.zoom_slider.setMaximum(100)
         self.zoom_slider.setValue(10)

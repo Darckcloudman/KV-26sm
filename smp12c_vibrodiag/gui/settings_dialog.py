@@ -472,7 +472,7 @@ class SettingsDialog(QDialog):
         self.save_log_btn.setStyleSheet(BUTTON_SMALL_STYLE)
         self.save_log_btn.setEnabled(False)
         self.save_log_btn.clicked.connect(self._save_scan_log)
-        layout.addWidget(self.save_log_btn, alignment=Qt.AlignRight)
+        layout.addWidget(self.save_log_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
         return widget
 

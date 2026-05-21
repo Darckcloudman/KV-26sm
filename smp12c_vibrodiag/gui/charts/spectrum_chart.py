@@ -159,7 +159,7 @@ class SpectrumChart(QWidget):
         self,
         freq_data: np.ndarray,
         amplitude_data: np.ndarray,
-        peak_range: tuple = None
+        peak_range: tuple | None = None
     ) -> None:
         """
         Установить данные для спектра.
