@@ -231,7 +231,7 @@ class TrendsScreen(QWidget):
 
         # Кривая тренда
         self.plot_curve = self.plot_widget.plot(
-            pen=pg.mkPen(color=COLOR_ACCENT, width=2, style=Qt.SolidLine),
+            pen=pg.mkPen(color=COLOR_ACCENT, width=2, style=Qt.PenStyle.SolidLine),
             symbol='o',
             symbolBrush=COLOR_ACCENT,
             symbolPen=COLOR_ACCENT,
@@ -246,7 +246,7 @@ class TrendsScreen(QWidget):
             line = pg.InfiniteLine(
                 pos=value,
                 angle=0,
-                pen=pg.mkPen(color=zone_colors[zone], width=1, style=Qt.DashLine)
+                pen=pg.mkPen(color=zone_colors[zone], width=1, style=Qt.PenStyle.DashLine)
             )
             line.setVisible(False)
             self.plot_widget.addItem(line)
@@ -316,7 +316,7 @@ class TrendsScreen(QWidget):
 
     def _on_avg_park_changed(self, state):
         """При переключении 'Среднее по ветропарку'."""
-        self.turbine_combo.setEnabled(state != Qt.Checked)
+        self.turbine_combo.setEnabled(state != Qt.CheckState.Checked)
 
     def _build_trend(self):
         """Построить график трендов."""

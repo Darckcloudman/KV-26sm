@@ -220,7 +220,7 @@ class RawDataCanvas(QWidget):
 
             # Курсор
             if self.show_cursor and m <= self.cursor_x <= w - m and m <= self.cursor_y <= h - m:
-                painter.setPen(QPen(QColor("#FF6B6B"), 1, Qt.DashLine))
+                painter.setPen(QPen(QColor("#FF6B6B"), 1, Qt.PenStyle.DashLine))
                 painter.drawLine(self.cursor_x, m, self.cursor_x, h - m)
                 painter.drawLine(m, self.cursor_y, w - m, self.cursor_y)
 

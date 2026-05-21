@@ -95,7 +95,7 @@ class MplCanvas(QWidget):
         zone_labels = ['A/B', 'B/C', 'C/D']
         for level, color, label in zip(zone_levels, zone_colors, zone_labels):
             y = to_y(level)
-            painter.setPen(QPen(QColor(color), 1, Qt.DashLine))
+            painter.setPen(QPen(QColor(color), 1, Qt.PenStyle.DashLine))
             painter.drawLine(margin, y, w - margin, y)
             painter.setPen(QColor('#888888'))
             painter.setFont(QFont('Consolas', 8))

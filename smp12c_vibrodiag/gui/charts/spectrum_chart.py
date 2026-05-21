@@ -147,7 +147,7 @@ class SpectrumChart(QWidget):
                 line = pg.InfiniteLine(
                     pos=value,
                     angle=0,
-                    pen=pg.mkPen(color=color, width=1, style=Qt.DashLine)
+                    pen=pg.mkPen(color=color, width=1, style=Qt.PenStyle.DashLine)
                 )
                 self.plot_widget.addItem(line)
                 self._threshold_lines.append(line)

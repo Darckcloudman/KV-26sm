@@ -635,7 +635,7 @@ class SettingsDialog(QDialog):
 
     def _on_db_mode_changed(self, state):
         """Обработка переключения режима БД."""
-        enabled = state == Qt.Checked
+        enabled = state == Qt.CheckState.Checked
         
         # Активируем/деактивируем поля БД
         self.db_host_input.setEnabled(enabled)
@@ -962,7 +962,7 @@ class SettingsDialog(QDialog):
         self.db_enabled_checkbox.setChecked(settings.use_database)
         
         # Обновляем статус
-        self._on_db_mode_changed(Qt.Checked if settings.use_database else Qt.Unchecked)
+        self._on_db_mode_changed(Qt.CheckState.Checked if settings.use_database else Qt.CheckState.Unchecked)
 
         # Хранилище
         self.storage_path_input.setText(str(settings.archive_storage_path))
