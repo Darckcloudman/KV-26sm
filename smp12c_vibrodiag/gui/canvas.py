@@ -14,7 +14,7 @@ class MplCanvas(QWidget):
     def __init__(self, parent=None, width=10, height=5, dpi=100):
         super().__init__(parent)
         self.setMinimumSize(400, 250)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet("background-color: #000000;")
 
         self.frequencies = np.array([])
@@ -94,7 +94,7 @@ class MplCanvas(QWidget):
         zone_colors = ['#555555', '#666666', '#777777']
         zone_labels = ['A/B', 'B/C', 'C/D']
         for level, color, label in zip(zone_levels, zone_colors, zone_labels):
-            y = to_y(level)
+            y = int(to_y(level))
             painter.setPen(QPen(QColor(color), 1, Qt.PenStyle.DashLine))
             painter.drawLine(margin, y, w - margin, y)
             painter.setPen(QColor('#888888'))
