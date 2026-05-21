@@ -3,9 +3,9 @@
 import numpy as np
 from typing import Optional, Callable
 
-from PyQt5.QtWidgets import QWidget, QSizePolicy
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QPen, QColor, QFont, QBrush
+from PySide6.QtWidgets import QWidget, QSizePolicy
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter, QPen, QColor, QFont, QBrush
 
 
 class MplCanvas(QWidget):
