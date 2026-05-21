@@ -338,31 +338,36 @@ STATUSBAR_ICON_STYLE = f"""
     }}
 """
 
-# Чек-боксы (белый фон, чёрная галочка, уменьшенный размер)
+# Чек-боксы (тёмный стиль CodePen: тёмный фон индикатора, зелёная галочка)
 CHECKBOX_STYLE = f"""
     QCheckBox {{
-        spacing: 4px;
-        color: {COLOR_TEXT_PRIMARY};
-        font-size: 10px;
+        font-size: 11px;
+        color: {COLOR_TEXT_SECONDARY};
+        spacing: 8px;
     }}
     QCheckBox::indicator {{
-        width: 6px;
-        height: 6px;
-        border: 1px solid #555555;
-        background-color: #FFFFFF;
-        border-radius: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+    }}
+    QCheckBox::indicator:unchecked {{
+        background-color: {COLOR_BG_TERTIARY};
+        border: 1.5px solid {COLOR_BORDER_LIGHT};
     }}
     QCheckBox::indicator:checked {{
-        background-color: #000000;
-        border: 1px solid #000000;
-        image: none;
+        background-color: {ZONE_COLORS['A']};
+        border: 1.5px solid {ZONE_COLORS['A']};
     }}
     QCheckBox::indicator:hover {{
-        border: 1px solid #888888;
+        border-color: {COLOR_TEXT_TERTIARY};
+        background-color: {COLOR_BG_SECONDARY};
     }}
     QCheckBox::indicator:disabled {{
-        background-color: #333333;
-        border: 1px solid #444444;
+        background-color: {COLOR_BG_SECONDARY};
+        border: 1.5px solid {COLOR_BORDER};
+    }}
+    QCheckBox:focus {{
+        outline: none;
     }}
 """
 

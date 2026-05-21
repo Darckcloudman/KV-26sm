@@ -110,6 +110,7 @@ from .directory_tree_dialog import DirectoryTreeDialog
 from .archive_tree_dialog import ArchiveTreeDialog
 from .rd2_tree_dialog import Rd2TreeDialog
 from .styled_message_box import show_critical, show_warning, show_info
+from .ui_styles import CHECKBOX_STYLE
 
 logger = get_logger("HomeScreen")
 
@@ -501,7 +502,7 @@ class HomeScreen(QWidget):
 
         # --- Автопарсинг (v1.4) ---
         self.auto_scan_checkbox = QCheckBox("Автоматически импортировать новые архивы")
-        self.auto_scan_checkbox.setStyleSheet("color: #BBBBBB; font-size: 10px; background: transparent;")
+        self.auto_scan_checkbox.setStyleSheet(CHECKBOX_STYLE)
         self.auto_scan_checkbox.setChecked(self.auto_scan_service is not None and self.auto_scan_service.enabled)
         self.auto_scan_checkbox.stateChanged.connect(self._on_auto_scan_toggled)
         left_top.addWidget(self.auto_scan_checkbox)

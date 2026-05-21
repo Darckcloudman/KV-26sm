@@ -229,6 +229,83 @@ panel.setStyleSheet(PANEL_STYLE)
 
 ---
 
+## Стиль чек-боксов (v1.4+)
+
+**Дизайн:** Тёмный стиль CodePen с акцентным зелёным цветом для отмеченного состояния.
+
+**Параметры:**
+- Размер индикатора: 14×14 px
+- Размер шрифта: 11 px
+- Цвет текста: `COLOR_TEXT_SECONDARY` (#BBBBBB)
+- Отступ между индикатором и текстом: 8 px
+
+**Состояния:**
+
+| Состояние | Фон индикатора | Граница | Описание |
+|-----------|----------------|---------|----------|
+| Unchecked | `#2A2A2A` | `#5A5A66` | Тёмный фон, серая граница |
+| Checked | `#00C853` | `#00C853` | Зелёный фон (зона A ISO) |
+| Hover | `#1A1A1A` | `#888888` | Светлее фон, светлее граница |
+| Disabled | `#1A1A1A` | `#333333` | Тёмный фон, тёмная граница |
+
+**Использование:**
+```python
+from .ui_styles import CHECKBOX_STYLE
+
+checkbox = QCheckBox("Опция")
+checkbox.setStyleSheet(CHECKBOX_STYLE)
+```
+
+**Пример в коде:**
+```python
+# HomeScreen
+self.auto_scan_checkbox = QCheckBox("Автоматически импортировать новые архивы")
+self.auto_scan_checkbox.setStyleSheet(CHECKBOX_STYLE)
+
+# SettingsDialog
+self.db_enabled_checkbox = QCheckBox("Использовать PostgreSQL")
+self.db_enabled_checkbox.setStyleSheet(CHECKBOX_STYLE)
+
+# TrendsScreen
+self.avg_park_checkbox = QCheckBox("Среднее по ветропарку")
+self.avg_park_checkbox.setStyleSheet(CHECKBOX_STYLE)
+```
+
+**QSS стиль (CHECKBOX_STYLE):**
+```css
+QCheckBox {
+    font-size: 11px;
+    color: #BBBBBB;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+}
+QCheckBox::indicator:unchecked {
+    background-color: #2A2A2A;
+    border: 1.5px solid #5A5A66;
+}
+QCheckBox::indicator:checked {
+    background-color: #00C853;
+    border: 1.5px solid #00C853;
+}
+QCheckBox::indicator:hover {
+    border-color: #888888;
+    background-color: #1A1A1A;
+}
+QCheckBox::indicator:disabled {
+    background-color: #1A1A1A;
+    border: 1.5px solid #333333;
+}
+QCheckBox:focus {
+    outline: none;
+}
+```
+
+---
+
 ## Архитектура GUI
 
 ### Структура экранов:

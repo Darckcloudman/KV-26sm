@@ -23,6 +23,7 @@ import pyqtgraph as pg
 from ..dal.repositories.base import IVibrationRepository
 from ..dal.config import settings
 from ..dal.logger import get_logger
+from .ui_styles import CHECKBOX_STYLE
 from .workers.trends_worker import TrendsWorker
 from .styled_message_box import show_critical, show_info
 from .ui_styles import (
@@ -135,7 +136,7 @@ class TrendsScreen(QWidget):
 
         # Среднее по ветропарку
         self.avg_park_checkbox = QCheckBox("Среднее по ветропарку")
-        self.avg_park_checkbox.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 11px;")
+        self.avg_park_checkbox.setStyleSheet(CHECKBOX_STYLE)
         self.avg_park_checkbox.stateChanged.connect(self._on_avg_park_changed)
         control_layout.addWidget(self.avg_park_checkbox)
 
