@@ -4,6 +4,7 @@
 """
 
 import numpy as np
+from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QFrame, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem,
@@ -106,7 +107,7 @@ class SensorStatusIndicator(QFrame):
         # Номер датчика
         self.id_label = QLabel(str(sensor_id))
         self.id_label.setStyleSheet(f'color: {COLOR_TEXT_PRIMARY}; font-size: 16px; font-weight: bold;')
-        self.id_label.setAlignment(Qt.AlignCenter)
+        self.id_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.id_label)
 
         # 3 секции для НЧ/ВЧ/ВЧ(ф)
@@ -301,10 +302,10 @@ class AnalysisDataScreen(QWidget):
         self.harmonics_table = QTableWidget()
         self.harmonics_table.setColumnCount(4)
         self.harmonics_table.setHorizontalHeaderLabels(['Пик', 'Частота (Гц)', 'Амплитуда', 'Зона'])
-        self.harmonics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.harmonics_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.harmonics_table.verticalHeader().setVisible(False)
-        self.harmonics_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.harmonics_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.harmonics_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.harmonics_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.harmonics_table.setMaximumHeight(180)
         self.harmonics_table.setStyleSheet(TABLE_STYLE + SCROLLBAR_STYLE)
         main_layout.addWidget(self.harmonics_table, 0)
@@ -349,6 +350,9 @@ class AnalysisDataScreen(QWidget):
 
     def _compute_all_sensor_zones(self):
         """Вычислить зоны ISO 10816 для всех датчиков."""
+        if self.parser is None:
+            return
+
         self._sensor_zones = {}
         analyzer = VibrationAnalyzer()
 
@@ -395,6 +399,9 @@ class AnalysisDataScreen(QWidget):
 
     def _select_sensor(self, sensor_id: int):
         """Выбрать датчик и обновить отображение."""
+        if self.parser is None:
+            return
+
         self._current_sensor = sensor_id
 
         # Обновляем выделение индикаторов
@@ -654,7 +661,7 @@ class AnalysisDataScreen(QWidget):
         from PySide6.QtCore import Qt
 
         progress = QProgressDialog("Экспорт данных...", "Отмена", 0, 100, self)
-        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setWindowTitle("Экспорт")
         progress.setStyleSheet("""
             QProgressDialog {
@@ -683,7 +690,7 @@ class AnalysisDataScreen(QWidget):
         progress.setValue(0)
 
         from .export_thread import ExportWorker
-        self.export_worker = ExportWorker(export_type, self.parser, sensor_id, file_path)
+        self.export_worker = ExportWorker(export_type, self.parser, sensor_id, Path(file_path))
         self.export_worker.progress.connect(lambda p, msg: progress.setValue(p) or progress.setLabelText(msg))
         self.export_worker.finished.connect(
             lambda ok, msg: self._on_export_finished(ok, msg, progress)
@@ -709,7 +716,7 @@ class AnalysisDataScreen(QWidget):
         from PySide6.QtCore import Qt
 
         progress = QProgressDialog("Формирование PDF-отчёта...", "Отмена", 0, 100, self)
-        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setWindowTitle("PDF-отчёт")
         progress.setStyleSheet("""
             QProgressDialog {
@@ -738,7 +745,7 @@ class AnalysisDataScreen(QWidget):
         progress.setValue(0)
 
         from .pdf_report_thread import PDFReportWorker
-        self.pdf_worker = PDFReportWorker(self.parser, sensor_id, file_path)
+        self.pdf_worker = PDFReportWorker(self.parser, sensor_id, Path(file_path))
         self.pdf_worker.progress.connect(lambda p, msg: progress.setValue(p) or progress.setLabelText(msg))
         self.pdf_worker.finished.connect(
             lambda ok, msg: self._on_export_finished(ok, msg, progress)

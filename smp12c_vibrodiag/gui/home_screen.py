@@ -79,7 +79,7 @@ class LoadingSpinner(QWidget):
     def paintEvent(self, event):
         """Отрисовка крутящегося индикатора."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if not self._is_spinning:
             return
@@ -184,7 +184,7 @@ class ParseThread(QThread):
                     load_result = loop.run_until_complete(
                         self.repository.load_archive(Path(self.file_path))
                     )
-                
+
                 if self._is_cancelled:
                     return
                 
@@ -337,7 +337,7 @@ class SensorScheme(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(650, 442)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet("background-color: #000000; border: none;")
 
         self._pixmap = None
@@ -444,17 +444,11 @@ class HomeScreen(QWidget):
         # Запускаем автопарсинг если доступен
         if self.auto_scan_service is not None:
             self.auto_scan_service.start_timer(self)
-            self.auto_scan_service.start_scan(
-                on_progress=self._on_scan_progress,
-                on_archive=self._on_scan_archive,
-                on_finished=self._on_scan_finished,
-                on_error=self._on_scan_error
-            )
 
     def _setup_ui(self):
         # Чёрный фон через палитру
         palette = self.palette()
-        palette.setColor(QPalette.Window, QColor("#000000"))
+        palette.setColor(QPalette.ColorRole.Window, QColor("#000000"))
         self.setAutoFillBackground(True)
         self.setPalette(palette)
 
@@ -511,31 +505,6 @@ class HomeScreen(QWidget):
         self.auto_scan_checkbox.setChecked(self.auto_scan_service is not None and self.auto_scan_service.enabled)
         self.auto_scan_checkbox.stateChanged.connect(self._on_auto_scan_toggled)
         left_top.addWidget(self.auto_scan_checkbox)
-        
-        self.scan_now_btn = QPushButton("Сканировать хранилище")
-        self.scan_now_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #333333;
-                color: #FFFFFF;
-                font-size: 11px;
-                padding: 6px 16px;
-                border: 1px solid #555555;
-                border-radius: 2px;
-                min-width: 190px;
-                text-align: left;
-            }
-            QPushButton:hover { background-color: #444444; }
-            QPushButton:pressed { background-color: #555555; }
-            QPushButton:disabled { background-color: #222222; color: #666666; }
-        """)
-        self.scan_now_btn.clicked.connect(self._start_manual_scan)
-        self.scan_now_btn.setEnabled(self.auto_scan_service is not None)
-        left_top.addWidget(self.scan_now_btn)
-        
-        self.scan_status_label = QLabel("")
-        self.scan_status_label.setStyleSheet("color: #888888; font-size: 9px; background: transparent;")
-        self.scan_status_label.setWordWrap(True)
-        left_top.addWidget(self.scan_status_label)
         # --- Конец автопарсинга ---
         
         left_top.addStretch()
@@ -594,10 +563,10 @@ class HomeScreen(QWidget):
         self.archive_table = QTableWidget()
         self.archive_table.setColumnCount(3)  # WTG, Дата, Размер
         self.archive_table.setHorizontalHeaderLabels(["WTG", "Дата записи", "Размер"])
-        self.archive_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.archive_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.archive_table.verticalHeader().setVisible(False)
-        self.archive_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.archive_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.archive_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.archive_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.archive_table.setMinimumWidth(300)
         self.archive_table.setMaximumWidth(600)
         self.archive_table.setStyleSheet("""
@@ -726,7 +695,7 @@ class HomeScreen(QWidget):
         # Контейнер для выравнивания статусов по верху
         status_container = QWidget()
         status_container.setLayout(status_wrapper)
-        right_layout.addWidget(status_container, 0, Qt.AlignTop)
+        right_layout.addWidget(status_container, 0, Qt.AlignmentFlag.AlignTop)
         right_layout.addStretch()  # всё лишнее пространство снизу
 
         middle_layout.addWidget(right_panel, 1)
@@ -773,13 +742,10 @@ class HomeScreen(QWidget):
         """Выбрать каталог с архивами и сохранить путь."""
         try:
             dialog = DirectoryTreeDialog(self, str(self.archive_dir))
-            if dialog.exec() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 selected_dir = dialog.get_selected_directory()
                 if selected_dir:
                     self.archive_dir = Path(selected_dir)
-                    self.path_label.setText(
-                        f"Путь к месту хранения архивов:\n{self.archive_dir}"
-                    )
                     set_last_archive_dir(self.archive_dir)
                     self._scan_archives()
         except Exception as e:
@@ -912,7 +878,7 @@ class HomeScreen(QWidget):
         """Открыть кастомный диалог выбора .rd2 файлов (мультивыбор)."""
         try:
             dialog = Rd2TreeDialog(self, str(self.archive_dir))
-            if dialog.exec() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 files = dialog.get_selected_files()
                 if files:
                     # Передаём первый файл или все файлы на обработку
@@ -924,7 +890,7 @@ class HomeScreen(QWidget):
         """Открыть кастомный диалог выбора .zip архива."""
         try:
             dialog = ArchiveTreeDialog(self, str(self.archive_dir))
-            if dialog.exec() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 file_path = dialog.get_selected_file()
                 if file_path:
                     self._parse_archive(file_path)
@@ -1027,74 +993,12 @@ class HomeScreen(QWidget):
     def _on_auto_scan_toggled(self, state):
         """Включить/выключить автопарсинг."""
         if self.auto_scan_service is not None:
-            self.auto_scan_service.enabled = (state == Qt.Checked)
+            self.auto_scan_service.enabled = (state == Qt.CheckState.Checked)
             if self.auto_scan_service.enabled:
                 self.auto_scan_service.start_timer(self)
             else:
                 self.auto_scan_service.stop_timer()
     
-    def _start_manual_scan(self):
-        """Запустить ручное сканирование хранилища."""
-        if self.auto_scan_service is None:
-            show_warning(self, "Автопарсинг недоступен", 
-                        "Сервис автопарсинга не инициализирован. "
-                        "Проверьте настройки подключения к БД.")
-            return
-        
-        if self.auto_scan_service.is_running():
-            show_info(self, "Сканирование", "Сканирование уже выполняется.")
-            return
-        
-        self.scan_now_btn.setEnabled(False)
-        self.scan_now_btn.setText("Сканирование...")
-        self.scan_status_label.setText("Сканирование запущено...")
-        
-        self.auto_scan_service.start_scan(
-            on_progress=self._on_scan_progress,
-            on_archive=self._on_scan_archive,
-            on_finished=self._on_scan_finished,
-            on_error=self._on_scan_error
-        )
-    
-    def _on_scan_progress(self, found, processed, skipped, total):
-        """Обновление прогресса сканирования."""
-        self.scan_status_label.setText(
-            f"Найдено: {found}, обработано: {processed}, "
-            f"пропущено: {skipped}"
-        )
-    
-    def _on_scan_archive(self, name, added, skipped):
-        """Обработан один архив."""
-        logger.debug("Автопарсинг: %s — добавлено %d, пропущено %d", name, added, skipped)
-    
-    def _on_scan_finished(self, result):
-        """Сканирование завершено."""
-        self.scan_now_btn.setEnabled(True)
-        self.scan_now_btn.setText("Сканировать хранилище")
-        
-        if result.processed > 0:
-            self.scan_status_label.setText(
-                f"Готово: обработано {result.processed} архивов, "
-                f"добавлено {result.added_records} записей"
-            )
-            # Показываем статусное сообщение в главном окне
-            from .main_window import MainWindow
-            main_win = self.window()
-            if isinstance(main_win, MainWindow):
-                main_win.show_status_message(
-                    f"Автопарсинг: добавлено {result.added_records} записей из {result.processed} архивов",
-                    "mdi.check-circle"
-                )
-        else:
-            self.scan_status_label.setText("Новых архивов не найдено")
-    
-    def _on_scan_error(self, error_msg):
-        """Ошибка сканирования."""
-        self.scan_now_btn.setEnabled(True)
-        self.scan_now_btn.setText("Сканировать хранилище")
-        self.scan_status_label.setText(f"Ошибка: {error_msg}")
-        logger.error("Ошибка автопарсинга: %s", error_msg)
-
     # === Конец автопарсинга ===
 
     def _on_load_result(self, result: Dict):
@@ -1186,9 +1090,10 @@ class HomeScreen(QWidget):
             self._loading_spinner.start()
             
             # Позиционируем спиннер справа от таблицы
-            rect = self.archive_table.visualItemRect(
-                self.archive_table.item(row, 2)  # Колонка 2 = "Размер"
-            )
+            item = self.archive_table.item(row, 2)  # Колонка 2 = "Размер"
+            if item is None:
+                return
+            rect = self.archive_table.visualItemRect(item)
             
             # Конвертируем координаты из таблицы в глобальные, затем в локальные HomeScreen
             table_pos = self.archive_table.mapToGlobal(rect.topLeft())
