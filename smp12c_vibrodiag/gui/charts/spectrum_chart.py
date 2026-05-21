@@ -30,7 +30,7 @@ class SpectrumChart(QWidget):
         x_label: str = "Частота (Гц)",
         y_label: str = "Амплитуда",
         freq_range: tuple = (0, 1000),
-        thresholds: dict = None,
+        thresholds: dict | None = None,
         highlight_peaks: bool = True,
         parent=None
     ):
