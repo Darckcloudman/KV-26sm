@@ -13,5 +13,6 @@ from .turbine import Turbine
 from .archive import Archive
 from .sensor_data import SensorData
 from .analysis_cache import AnalysisCache
+from .processed_archive import ProcessedArchive
 
-__all__ = ['Base', 'Turbine', 'Archive', 'SensorData', 'AnalysisCache']
+__all__ = ['Base', 'Turbine', 'Archive', 'SensorData', 'AnalysisCache', 'ProcessedArchive']

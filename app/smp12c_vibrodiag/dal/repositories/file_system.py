@@ -35,7 +35,7 @@ class FileSystemRepository(IVibrationRepository):
         self._current_parser: Optional[MultiSensorRD2Parser] = None
         self._current_file: Optional[str] = None
     
-    async def load_archive(self, archive_path: Path) -> bool:
+    async def load_archive(self, archive_path: Path) -> Dict[str, Any]:
         """
         Загрузить архив через парсер.
         
@@ -43,7 +43,11 @@ class FileSystemRepository(IVibrationRepository):
             archive_path: Путь к файлу .zip или .rd2.
             
         Returns:
-            True если парсинг успешен.
+            Словарь с результатами:
+            - success: bool
+            - added: int (всегда 1 для файлового режима)
+            - skipped: int (всегда 0)
+            - errors: List[str]
         """
         try:
             # Запускаем парсинг в отдельном потоке (для неблокировки GUI)
@@ -54,12 +58,12 @@ class FileSystemRepository(IVibrationRepository):
             if parser and parser._parsed:
                 self._current_parser = parser
                 self._current_file = str(archive_path)
-                return True
-            return False
+                return {'success': True, 'added': 1, 'skipped': 0, 'errors': []}
+            return {'success': False, 'added': 0, 'skipped': 0, 'errors': ['Парсинг не удался']}
             
         except Exception as e:
             print(f"Ошибка загрузки архива: {e}")
-            return False
+            return {'success': False, 'added': 0, 'skipped': 0, 'errors': [str(e)]}
     
     def _parse_archive_sync(self, archive_path: Path) -> MultiSensorRD2Parser:
         """Синхронный парсинг (вызывается через asyncio.to_thread)."""
@@ -354,3 +358,23 @@ class FileSystemRepository(IVibrationRepository):
         if success:
             return self._current_parser
         return None
+
+    # === Методы для работы с ветропарком (v1.4) ===
+    # В файловом режиме статистика и тренды недоступны
+
+    async def list_turbines(self) -> List[Dict[str, Any]]:
+        """В файловом режиме — пустой список."""
+        return []
+
+    async def get_turbine_statistics(self, wtg_id: str) -> Optional[Dict[str, Any]]:
+        """В файловом режиме — недоступно."""
+        return None
+
+    async def get_rms_trend(
+        self,
+        wtg_id: Optional[str] = None,
+        sensor_id: int = 1,
+        filter_type: str = "LOW"
+    ) -> List[Dict[str, Any]]:
+        """В файловом режиме — пустой список."""
+        return []

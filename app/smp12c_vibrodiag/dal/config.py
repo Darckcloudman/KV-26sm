@@ -7,7 +7,7 @@
 
 from pathlib import Path
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -32,8 +32,20 @@ class Settings(BaseSettings):
     # Логирование SQL запросов
     db_echo: bool = False
     
+    # Повторные попытки подключения к БД
+    db_connect_retries: int = 3
+    db_connect_retry_delay: float = 1.0
+    
+    # Уровень логирования DAL (DEBUG, INFO, WARNING, ERROR)
+    log_level: str = "INFO"
+    
     # Путь к хранилищу архивов
     archive_storage_path: Path = Path("./test_data")
+    
+    # Автопарсинг хранилища
+    auto_scan_enabled: bool = True
+    auto_scan_interval_minutes: int = 10
+    auto_scan_max_depth: int = 5
     
     @property
     def database_url(self) -> str:
@@ -51,11 +63,12 @@ class Settings(BaseSettings):
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
         # Поддержка типа Path
-        json_encoders = {Path: str}
+        json_encoders={Path: str}
+    )
 
 
 # Глобальный экземпляр настроек

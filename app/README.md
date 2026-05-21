@@ -12,6 +12,12 @@ GUI-приложение для анализа вибрационной диаг
 - Кэширование спектров и результатов анализа
 - Утилита миграции `migrate_archives.py`
 
+### Варианты А-Г (2025-01-25 — 2025-01-28)
+- **Вариант А**: Исправлен PyQt5 → PySide6, 4 экрана навигации, интеграция с БД
+- **Вариант Б**: Логирование в DAL, retry PostgreSQL, поиск в HomeScreen, диалог миграции БД
+- **Вариант В**: Экспорт CSV/Excel/PDF, вкладка «Тренды RMS», PDF-отчёты по турбине
+- **Вариант Г**: 41 unit-тест, исправления Pydantic, документация
+
 ### GUI улучшения (2025-01-25)
 - **Новый диалог выбора директории** (`directory_tree_dialog.py`):
   - Древовидный просмотр файловой системы с навигацией
@@ -54,11 +60,13 @@ GUI-приложение для анализа вибрационной диаг
 
 ## Быстрый старт
 
-> **PowerShell Execution Policy:** Если при запуске скриптов возникает ошибка `PSSecurityException`, используйте флаг `-ExecutionPolicy Bypass` (рекомендуется для ИИ-агентов и автоматизации):
+> **PowerShell Execution Policy:** If scripts fail with `PSSecurityException`, use `-ExecutionPolicy Bypass`:
 > ```powershell
 > powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
 > ```
-> Не изменяйте глобальные политики выполнения (`Set-ExecutionPolicy`) — это небезопасно.
+> Do not change global execution policy (`Set-ExecutionPolicy`) — unsafe.
+>
+> **Encoding note:** All PowerShell scripts use English text to avoid UTF-8 encoding issues in Windows PowerShell.
 
 ### Установка
 
@@ -152,3 +160,9 @@ app/
 ## Лицензия
 
 Проект создан на основе реверс-инжиниринга декомпилированного приложения.
+
+## 📄 Документация
+
+- [DAL_GUIDE.md](DAL_GUIDE.md) - полное руководство по DAL
+- [GETTING_STARTED.md](GETTING_STARTED.md) - быстрый старт
+- [DEVELOPMENT_GUIDELINES.md](DEVELOPMENT_GUIDELINES.md) - руководство разработчика (стили, иконки, архитектура)

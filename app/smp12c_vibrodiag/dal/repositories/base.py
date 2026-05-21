@@ -22,18 +22,22 @@ class IVibrationRepository(ABC):
     """
     
     @abstractmethod
-    async def load_archive(self, archive_path: Path) -> bool:
+    async def load_archive(self, archive_path: Path) -> Dict[str, Any]:
         """
         Загрузить архив с данными.
         
         Для FileSystemRepository: просто парсит файл и сохраняет в памяти.
-        Для PostgresRepository: парсит и сохраняет данные в БД.
+        Для PostgresRepository: парсит и сохраняет данные в БД с дедупликацией.
         
         Args:
             archive_path: Путь к файлу .zip или .rd2.
             
         Returns:
-            True если загрузка успешна, False иначе.
+            Словарь с результатами:
+            - success: bool — общий успех
+            - added: int — количество добавленных записей
+            - skipped: int — количество пропущенных дубликатов
+            - errors: List[str] — список ошибок
         """
         pass
     
@@ -84,7 +88,7 @@ class IVibrationRepository(ABC):
             - high_freq_fs: Частота дискретизации
         """
         pass
-    
+
     @abstractmethod
     async def get_spectrum(
         self,
@@ -178,5 +182,59 @@ class IVibrationRepository(ABC):
             
         Returns:
             Объект MultiSensorRD2Parser или None.
+        """
+        pass
+
+    # === Методы для работы с ветропарком (v1.4) ===
+
+    @abstractmethod
+    async def list_turbines(self) -> List[Dict[str, Any]]:
+        """
+        Получить список всех ВЭУ (турбин).
+        
+        Returns:
+            Список словарей:
+            - wtg_id: Идентификатор (например, 'WTG37')
+            - name: Название/описание
+            - total_archives: Количество записей
+        """
+        pass
+
+    @abstractmethod
+    async def get_turbine_statistics(self, wtg_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Получить статистику по конкретной ВЭУ.
+        
+        Args:
+            wtg_id: Идентификатор турбины (например, 'WTG37').
+            
+        Returns:
+            Словарь со статистикой:
+            - total_archives: Общее количество записей
+            - first_record: Дата первой записи
+            - last_record: Дата последней записи
+            - avg_rms_per_sensor: Средний RMS по датчикам
+            - trend_last_10: Список последних 10 записей (date, rms)
+            - critical_count: Количество записей в зоне D
+        """
+        pass
+
+    @abstractmethod
+    async def get_rms_trend(
+        self,
+        wtg_id: Optional[str] = None,
+        sensor_id: int = 1,
+        filter_type: str = "LOW"
+    ) -> List[Dict[str, Any]]:
+        """
+        Получить тренд RMS по времени.
+        
+        Args:
+            wtg_id: Идентификатор турбины (None для агрегации по всему парку).
+            sensor_id: Номер датчика (1-8).
+            filter_type: Тип фильтра (FILTER/LOW/HIGH).
+            
+        Returns:
+            Список точек {date, rms_total} для построения графика.
         """
         pass

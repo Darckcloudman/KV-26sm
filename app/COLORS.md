@@ -1,6 +1,6 @@
 # Справочник цветов интерфейса SMP12C VibroDiag Analyzer
 
-**Версия:** v1.3 | **Последнее обновление:** 2025-01-19
+**Версия:** v1.4 | **Последнее обновление:** 2025-05-20
 
 ---
 
@@ -25,6 +25,16 @@
 | QMenu | background | `#1A1A1A` | 134 |
 | QMenu | color | `#FFFFFF` | 135 |
 | QMenu::item:selected | background | `#333333` | 139 |
+| **QStatusBar** | **background** | **`#2A2A2A`** | **NEW** |
+| **QStatusBar** | **border-top** | **`#333333`** | **NEW** |
+| **QProgressBar** | **background** | **`#1A1A1A`** | **NEW** |
+| **QProgressBar** | **border** | **`#333333`** | **NEW** |
+| **QProgressBar::chunk** | **background** | **`#FFFFFF`** | **NEW** |
+| **Status icon (ready)** | **qtawesome** | **`mdi.check-circle` `#00C853`** | **NEW** |
+| **Status icon (loading)** | **qtawesome** | **`mdi.loading` `#FFC107`** | **NEW** |
+| **Status icon (error)** | **qtawesome** | **`mdi.alert-circle` `#DD2C00`** | **NEW** |
+| **Status icon (DB mode)** | **qtawesome** | **`mdi.database` `#448AFF`** | **NEW** |
+| **Status icon (file mode)** | **qtawesome** | **`mdi.folder` `#888888`** | **NEW** |
 
 ---
 
@@ -260,6 +270,57 @@
 | **Alert icon (warning)** | **qtawesome** | **`mdi.alert` `#FFC107`** | — |
 | **Info icon** | **qtawesome** | **`mdi.information` `#448AFF`** | — |
 | **Question icon** | **qtawesome** | **`mdi.help-circle` `#448AFF`** | — |
+
+---
+
+## settings_dialog.py — Настройки
+
+| Элемент | Свойство | Цвет | Строка |
+|---------|----------|------|--------|
+| QDialog | background | `#000000` | NEW |
+| QTabWidget::pane | background | `#1A1A1A` | NEW |
+| QTabWidget::pane | border | `#333333` | NEW |
+| QTabBar::tab | background | `#2A2A2A` | NEW |
+| QTabBar::tab | color | `#888888` | NEW |
+| QTabBar::tab:selected | background | `#1A1A1A` | NEW |
+| QTabBar::tab:selected | color | `#FFFFFF` | NEW |
+| QTabBar::tab:selected | border-bottom | `#FFFFFF` | NEW |
+| QLineEdit | background | `#2A2A2A` | NEW |
+| QLineEdit | color | `#FFFFFF` | NEW |
+| QLineEdit | border | `#333333` | NEW |
+| QSpinBox | background | `#2A2A2A` | NEW |
+| QSpinBox | color | `#FFFFFF` | NEW |
+| QSpinBox | border | `#333333` | NEW |
+| QComboBox | background | `#2A2A2A` | NEW |
+| QComboBox | color | `#FFFFFF` | NEW |
+| QComboBox | border | `#333333` | NEW |
+| QCheckBox | color | `#FFFFFF` | NEW |
+| ModuleStatusIndicator | background | `#2A2A2A` | NEW |
+| ModuleStatusIndicator | border | `#333333` | NEW |
+| Status dot (OK) | background | `#00C853` | NEW |
+| Status dot (error) | background | `#DD2C00` | NEW |
+| Критичный модуль label | color | `#DD2C00` | NEW |
+
+## trends_screen.py — Тренды
+
+| Элемент | Свойство | Цвет | Строка |
+|---------|----------|------|--------|
+| QWidget | background | `#000000` | NEW |
+| QFrame (control_panel) | background | `#1A1A1A` | NEW |
+| QFrame (control_panel) | border | `#333333` | NEW |
+| QComboBox | background | `#000000` | NEW |
+| QComboBox | color | `#FFFFFF` | NEW |
+| QComboBox | border | `#333333` | NEW |
+| QCheckBox | color | `#BBBBBB` | NEW |
+| pyqtgraph background | background | `#000000` | NEW |
+| pyqtgraph foreground | foreground | `#FFFFFF` | NEW |
+| График линия | color | `#FFFFFF` | NEW |
+| График точки | color | `#FFFFFF` | NEW |
+| Порог A | color | `#00C853` (dash) | NEW |
+| Порог B | color | `#FFC107` (dash) | NEW |
+| Порог C | color | `#FF9800` (dash) | NEW |
+| QFrame (stats_panel) | background | `#1A1A1A` | NEW |
+| QFrame (stats_panel) | border | `#333333` | NEW |
 
 ---
 

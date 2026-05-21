@@ -27,6 +27,9 @@ sqlalchemy>=2.0.0
 # Асинхронный драйвер PostgreSQL
 asyncpg>=0.29.0
 
+# Синхронный драйвер для Alembic и psycopg2
+psycopg2-binary>=2.9.9
+
 # Миграции базы данных
 alembic>=1.12.0
 
@@ -36,3 +39,10 @@ pydantic-settings>=2.1.0
 
 # Загрузка переменных окружения
 python-dotenv>=1.0.0
+
+# === Экспорт и отчёты (Вариант В) ===
+# Excel экспорт (XLSX)
+openpyxl>=3.1.0
+
+# PDF отчёты
+reportlab>=4.0.0

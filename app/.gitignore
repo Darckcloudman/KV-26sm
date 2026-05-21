@@ -32,3 +32,6 @@ app_settings.json
 *.exe
 *.spec
 run.log
+app.log
+Prometeus.txt
+IMPLEMENTATION_SUMMARY_v1.3.md
