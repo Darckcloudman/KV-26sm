@@ -83,6 +83,7 @@ class RD2Parser:
         # Строка 1: Основная информация (формат одинаковый)
         line1 = header_lines[0].strip().split(', ')
         self.metadata['record_number'] = line1[0]
+        self.metadata['sensor_serial'] = line1[0]  # v1.4: серийный номер датчика (первое поле)
         self.metadata['record_datetime'] = line1[1]
         self.metadata['turbine_id'] = line1[2]
         self.metadata['wtg_id'] = line1[3]
