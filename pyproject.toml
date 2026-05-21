@@ -21,8 +21,14 @@ dependencies = [
 [tool.pyright]
 include = ["smp12c_vibrodiag"]
 exclude = [
+    "**/node_modules",
+    "**/.*",
     "**/__pycache__",
     "**/tests",
+    "venv",
+    ".git",
+    "build",
+    "dist",
     "smp12c_vibrodiag/gui/main_window_old.py",
 ]
 pythonVersion = "3.11"
