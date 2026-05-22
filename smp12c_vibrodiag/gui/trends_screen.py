@@ -58,7 +58,7 @@ class TurbinesLoaderThread(QThread):
 class TrendsScreen(QWidget):
     """Вкладка для анализа трендов вибрации."""
 
-    def __init__(self, repository: IVibrationRepository, parent=None):
+    def __init__(self, repository: Optional[IVibrationRepository] = None, parent=None):
         super().__init__(parent)
         self.repository = repository
         self._turbines: List[Dict[str, Any]] = []
@@ -278,7 +278,7 @@ class TrendsScreen(QWidget):
 
     def _load_turbines(self):
         """Загрузить список турбин из репозитория."""
-        if not settings.use_database:
+        if not settings.use_database or self.repository is None:
             return
 
         self.turbine_combo.clear()
@@ -320,7 +320,7 @@ class TrendsScreen(QWidget):
 
     def _build_trend(self):
         """Построить график трендов."""
-        if not settings.use_database:
+        if not settings.use_database or self.repository is None:
             show_info(self, "Информация", "Тренды доступны только в режиме PostgreSQL.")
             return
 

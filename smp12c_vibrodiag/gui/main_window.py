@@ -539,6 +539,8 @@ class MainWindow(QMainWindow):
         """Открыть диалог настроек."""
         dialog = SettingsDialog(self, repository_switcher=self.repository_switcher)
         dialog.settings_changed.connect(self._on_settings_changed)
+        dialog.archives_found.connect(self.home_screen.add_archives)
+        dialog.switch_to_home.connect(lambda: self.tabs.setCurrentIndex(0))
         dialog.exec()
 
     def _on_settings_changed(self):

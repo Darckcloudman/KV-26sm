@@ -7,6 +7,7 @@
 """
 
 import base64
+import os
 
 # === ЦВЕТОВАЯ ПАЛИТРА ===
 
@@ -340,49 +341,40 @@ STATUSBAR_ICON_STYLE = f"""
     }}
 """
 
-# Чек-боксы (тёмный стиль CodePen: тёмный фон индикатора, зелёная галочка)
-
-def _checkbox_checked_image(bg: str = ZONE_COLORS['A']) -> str:
-    """Генерирует SVG с зелёным фоном и белой галочкой ✓ шрифтом Arial."""
-    svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">'
-        f'<rect width="14" height="14" rx="3" fill="{bg}"/>'
-        '<text x="7" y="11" font-family="Arial" font-size="10" fill="white" text-anchor="middle">✓</text>'
-        '</svg>'
-    )
-    b64 = base64.b64encode(svg.encode('utf-8')).decode('ascii')
-    return f"url('data:image/svg+xml;base64,{b64}')"
-
-
-_CHECKBOX_CHECKED_IMG = _checkbox_checked_image()
+# Чек-боксы (светлый фон, зелёная галочка PNG)
+_CHECKBOX_CHECKED_PATH = os.path.join(os.path.dirname(__file__), 'checkbox_checked.png').replace('\\', '/')
 
 CHECKBOX_STYLE = f"""
     QCheckBox {{
         font-size: 11px;
-        color: {COLOR_TEXT_SECONDARY};
-        spacing: 8px;
+        color: {COLOR_TEXT_PRIMARY};
+        spacing: 6px;
     }}
     QCheckBox::indicator {{
-        width: 14px;
-        height: 14px;
+        width: 10px;
+        height: 10px;
         border-radius: 3px;
     }}
     QCheckBox::indicator:unchecked {{
-        background-color: {COLOR_BG_TERTIARY};
-        border: 1.5px solid {COLOR_BORDER_LIGHT};
+        background-color: #3A3A3A;
+        border: 1.5px solid #5A5A5A;
     }}
     QCheckBox::indicator:checked {{
-        background-color: {ZONE_COLORS['A']};
-        border: 1.5px solid {ZONE_COLORS['A']};
-        image: {_CHECKBOX_CHECKED_IMG};
+        background-color: #FFFFFF;
+        border: 1.5px solid #FFFFFF;
+        image: url({_CHECKBOX_CHECKED_PATH!r});
     }}
-    QCheckBox::indicator:hover {{
-        border-color: {COLOR_TEXT_TERTIARY};
-        background-color: {COLOR_BG_SECONDARY};
+    QCheckBox::indicator:hover:unchecked {{
+        background-color: #4A4A4A;
+        border-color: #7A7A7A;
+    }}
+    QCheckBox::indicator:hover:checked {{
+        background-color: #FFFFFF;
+        border-color: #FFFFFF;
     }}
     QCheckBox::indicator:disabled {{
-        background-color: {COLOR_BG_SECONDARY};
-        border: 1.5px solid {COLOR_BORDER};
+        background-color: #2A2A2A;
+        border-color: #444444;
     }}
     QCheckBox:focus {{
         outline: none;

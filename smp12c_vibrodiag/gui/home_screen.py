@@ -754,6 +754,38 @@ class HomeScreen(QWidget):
                 self, "Ошибка", f"Не удалось открыть диалог:\n{str(e)}"
             )
             
+    def add_archives(self, archives: list):
+        """Добавить архивы в таблицу (из сканирования настроек).
+        
+        Args:
+            archives: Список словарей с ключами turbine, date_str, size, path, filename
+        """
+        if not archives:
+            return
+
+        # Добавляем новые архивы, избегая дубликатов по пути
+        existing_paths = {a['path'] for a in self._all_archives}
+        added_count = 0
+        
+        for archive in archives:
+            if archive['path'] not in existing_paths:
+                self._all_archives.append(archive)
+                existing_paths.add(archive['path'])
+                added_count += 1
+        
+        # Сортируем по имени файла
+        self._all_archives.sort(key=lambda a: a['filename'])
+        
+        # Обновляем отображение с текущим фильтром
+        self._apply_filter(self.search_input.text())
+        
+        # Устанавливаем директорию из первого архива если ещё не задана
+        if archives and not self.archive_dir.exists():
+            first_path = Path(archives[0]['path']).parent
+            if first_path.exists():
+                self.archive_dir = first_path
+                set_last_archive_dir(first_path)
+
     def _scan_archives(self):
         """Сканировать каталог и заполнить таблицу архивами (.zip)."""
         try:

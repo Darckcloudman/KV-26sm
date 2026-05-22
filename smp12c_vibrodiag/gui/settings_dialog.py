@@ -23,14 +23,16 @@ from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QProgressBar, QCheckBox,
     QTextEdit, QPlainTextEdit, QGroupBox, QSplitter
 )
-from PySide6.QtCore import Qt, Signal, QThread, QTimer
-from PySide6.QtGui import QFont, QTextCursor
+from PySide6.QtCore import Qt, Signal, QThread, QTimer, QSize
+from PySide6.QtGui import QFont, QTextCursor, QIcon
+import qtawesome as qta
 
 from .ui_styles import (
     COLOR_BG_PRIMARY, COLOR_BG_SECONDARY, COLOR_BG_TERTIARY,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_TEXT_TERTIARY,
-    COLOR_BORDER, COLOR_ACCENT, COLOR_ACCENT_HOVER,
-    BUTTON_STYLE, BUTTON_SMALL_STYLE, CHECKBOX_STYLE, LOG_TEXT_STYLE
+    COLOR_TEXT_DISABLED, COLOR_BORDER, COLOR_BORDER_SUBTLE,
+    COLOR_ACCENT, COLOR_ACCENT_HOVER, COLOR_ACCENT_PRESSED,
+    BUTTON_STYLE, BUTTON_SMALL_STYLE, CHECKBOX_STYLE, LOG_TEXT_STYLE, SCROLLBAR_STYLE
 )
 from .styled_message_box import show_info, show_critical
 from ..dal.config import settings
@@ -166,6 +168,8 @@ class SettingsDialog(QDialog):
     """Диалог настроек приложения."""
 
     settings_changed = Signal()  # Сигнал изменения настроек
+    archives_found = Signal(list)  # Сигнал найденных архивов (список dict)
+    switch_to_home = Signal()  # Сигнал перехода на вкладку Home
 
     def __init__(self, parent=None, repository_switcher: Optional[RepositorySwitcher] = None):
         super().__init__(parent)
@@ -246,49 +250,21 @@ class SettingsDialog(QDialog):
         modules_widget = self._create_modules_tab()
         self.tabs.addTab(modules_widget, "Модули")
 
-        # Кнопки
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-
-        self.apply_btn = QPushButton("Применить")
-        self.apply_btn.setStyleSheet(BUTTON_STYLE)
-        self.apply_btn.setFixedWidth(120)
-        self.apply_btn.clicked.connect(self._apply_settings)
-        btn_layout.addWidget(self.apply_btn)
-
-        self.cancel_btn = QPushButton("✖ Отмена")
-        self.cancel_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_BG_TERTIARY};
-                color: {COLOR_TEXT_SECONDARY};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 11px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLOR_BG_SECONDARY};
-                color: {COLOR_TEXT_PRIMARY};
-            }}
-        """)
-        self.cancel_btn.setFixedWidth(120)
-        self.cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(self.cancel_btn)
-
-        layout.addLayout(btn_layout)
-
     def _create_database_tab(self) -> QWidget:
         """Создать вкладку настроек БД."""
         widget = QWidget()
-        layout = QFormLayout(widget)
+        layout = QVBoxLayout(widget)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
+
+        form_layout = QFormLayout()
+        form_layout.setSpacing(10)
 
         # Переключатель режима БД
         self.db_enabled_checkbox = QCheckBox("Использовать PostgreSQL")
         self.db_enabled_checkbox.setStyleSheet(CHECKBOX_STYLE)
         self.db_enabled_checkbox.stateChanged.connect(self._on_db_mode_changed)
-        layout.addRow("Режим хранения:", self.db_enabled_checkbox)
+        form_layout.addRow("Режим хранения:", self.db_enabled_checkbox)
 
         # Хост
         self.db_host_input = QLineEdit()
@@ -302,7 +278,7 @@ class SettingsDialog(QDialog):
                 font-size: 11px;
             }}
         """)
-        layout.addRow("Хост PostgreSQL:", self.db_host_input)
+        form_layout.addRow("Хост PostgreSQL:", self.db_host_input)
 
         # Порт
         self.db_port_input = QSpinBox()
@@ -317,7 +293,7 @@ class SettingsDialog(QDialog):
                 font-size: 11px;
             }}
         """)
-        layout.addRow("Порт:", self.db_port_input)
+        form_layout.addRow("Порт:", self.db_port_input)
 
         # Пользователь
         self.db_user_input = QLineEdit()
@@ -331,7 +307,7 @@ class SettingsDialog(QDialog):
                 font-size: 11px;
             }}
         """)
-        layout.addRow("Пользователь:", self.db_user_input)
+        form_layout.addRow("Пользователь:", self.db_user_input)
 
         # База данных
         self.db_name_input = QLineEdit()
@@ -345,7 +321,7 @@ class SettingsDialog(QDialog):
                 font-size: 11px;
             }}
         """)
-        layout.addRow("База данных:", self.db_name_input)
+        form_layout.addRow("База данных:", self.db_name_input)
 
         # Ретраи
         self.db_retries_input = QSpinBox()
@@ -360,7 +336,7 @@ class SettingsDialog(QDialog):
                 font-size: 11px;
             }}
         """)
-        layout.addRow("Повторы подключения:", self.db_retries_input)
+        form_layout.addRow("Повторы подключения:", self.db_retries_input)
 
         # Задержка между ретраями
         self.db_retry_delay_input = QSpinBox()
@@ -376,12 +352,46 @@ class SettingsDialog(QDialog):
                 font-size: 11px;
             }}
         """)
-        layout.addRow("Задержка повтора:", self.db_retry_delay_input)
+        form_layout.addRow("Задержка повтора:", self.db_retry_delay_input)
 
         # Статус подключения
         self.db_status_label = QLabel("")
         self.db_status_label.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px;")
-        layout.addRow("Статус:", self.db_status_label)
+        form_layout.addRow("Статус:", self.db_status_label)
+
+        layout.addLayout(form_layout)
+        layout.addStretch()
+
+        # Кнопки Применить/Отмена только для БД
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        apply_btn = QPushButton("Применить")
+        apply_btn.setStyleSheet(BUTTON_STYLE)
+        apply_btn.setFixedWidth(120)
+        apply_btn.clicked.connect(self._apply_settings)
+        btn_layout.addWidget(apply_btn)
+
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_BG_TERTIARY};
+                color: {COLOR_TEXT_SECONDARY};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_BG_SECONDARY};
+                color: {COLOR_TEXT_PRIMARY};
+            }}
+        """)
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        layout.addLayout(btn_layout)
 
         return widget
 
@@ -392,7 +402,55 @@ class SettingsDialog(QDialog):
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
 
-        # Путь к хранилищу
+        # === 1. Лог сканирования + кнопка сохранения (ВВЕРХУ) ===
+        log_header_layout = QHBoxLayout()
+        
+        log_label = QLabel("Лог сканирования:")
+        log_label.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 11px;")
+        log_header_layout.addWidget(log_label)
+        
+        log_header_layout.addStretch()
+        
+        # Кнопка сохранения лога
+        self.save_log_btn = QPushButton("Сохранить лог")
+        self.save_log_btn.setIcon(qta.icon('fa5.save', color='#000000', scale_factor=0.8))
+        self.save_log_btn.setIconSize(QSize(18, 18))
+        self.save_log_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLOR_BG_TERTIARY};
+                color: {COLOR_TEXT_DISABLED};
+            }}
+        """)
+        self.save_log_btn.setEnabled(False)
+        self.save_log_btn.clicked.connect(self._save_scan_log)
+        log_header_layout.addWidget(self.save_log_btn)
+        
+        layout.addLayout(log_header_layout)
+        
+        self.scan_log = QTextEdit()
+        self.scan_log.setReadOnly(True)
+        self.scan_log.setStyleSheet(LOG_TEXT_STYLE + SCROLLBAR_STYLE)
+        self.scan_log.setMinimumHeight(200)
+        self.scan_log.setPlaceholderText("Здесь будет отображаться подробный лог процесса сканирования...")
+        layout.addWidget(self.scan_log, stretch=1)
+        
+        # === 2. Путь к хранилищу + Обзор (ПОСЕРЕДИНЕ) ===
         path_group = QHBoxLayout()
         
         path_label = QLabel("Путь к архивам:")
@@ -413,27 +471,100 @@ class SettingsDialog(QDialog):
         path_group.addWidget(self.storage_path_input, stretch=1)
 
         browse_btn = QPushButton("Обзор...")
-        browse_btn.setStyleSheet(BUTTON_SMALL_STYLE)
-        browse_btn.setFixedWidth(80)
+        browse_btn.setIcon(qta.icon('mdi.folder-plus', color='#000000', scale_factor=0.8))
+        browse_btn.setIconSize(QSize(18, 18))
+        browse_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLOR_BG_TERTIARY};
+                color: {COLOR_TEXT_DISABLED};
+            }}
+        """)
+        browse_btn.setFixedWidth(100)
         browse_btn.clicked.connect(self._browse_storage_path)
         path_group.addWidget(browse_btn)
-        
+
         layout.addLayout(path_group)
 
-        # Кнопка сканирования + прогресс
+        # === 3. Кнопки сканирования + прогресс (ВНИЗУ) ===
         scan_layout = QHBoxLayout()
         
-        self.scan_btn = QPushButton("▶ Сканировать хранилище")
-        self.scan_btn.setStyleSheet(BUTTON_STYLE)
+        # Кнопка "Сканировать" с иконкой QtAwesome mdi.folder-search
+        self.scan_btn = QPushButton()
+        self.scan_btn.setText("Сканировать")
+        self.scan_btn.setIcon(qta.icon('mdi.folder-search', color='#000000', scale_factor=0.8))
+        self.scan_btn.setIconSize(QSize(18, 18))
+        self.scan_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLOR_BG_TERTIARY};
+                color: {COLOR_TEXT_DISABLED};
+            }}
+        """)
         self.scan_btn.clicked.connect(self._start_scan)
         scan_layout.addWidget(self.scan_btn)
-        
-        self.scan_cancel_btn = QPushButton("⏹ Отмена")
-        self.scan_cancel_btn.setStyleSheet(BUTTON_SMALL_STYLE)
+
+        # Кнопка "Отмена" с иконкой QtAwesome mdi.cancel
+        self.scan_cancel_btn = QPushButton()
+        self.scan_cancel_btn.setText("Отмена")
+        self.scan_cancel_btn.setIcon(qta.icon('mdi.cancel', color='#000000', scale_factor=0.8))
+        self.scan_cancel_btn.setIconSize(QSize(18, 18))
+        self.scan_cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLOR_BG_TERTIARY};
+                color: {COLOR_TEXT_DISABLED};
+            }}
+        """)
         self.scan_cancel_btn.setEnabled(False)
         self.scan_cancel_btn.clicked.connect(self._cancel_scan)
         scan_layout.addWidget(self.scan_cancel_btn)
-        
+
         self.scan_progress = QProgressBar()
         self.scan_progress.setStyleSheet(f"""
             QProgressBar {{
@@ -451,28 +582,40 @@ class SettingsDialog(QDialog):
         """)
         self.scan_progress.setVisible(False)
         scan_layout.addWidget(self.scan_progress, stretch=1)
-        
-        scan_layout.addStretch()
-        layout.addLayout(scan_layout)
 
-        # Лог сканирования
-        log_label = QLabel("Лог сканирования:")
-        log_label.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 11px;")
-        layout.addWidget(log_label)
-        
-        self.scan_log = QTextEdit()
-        self.scan_log.setReadOnly(True)
-        self.scan_log.setStyleSheet(LOG_TEXT_STYLE)
-        self.scan_log.setMinimumHeight(200)
-        self.scan_log.setPlaceholderText("Здесь будет отображаться подробный лог процесса сканирования...")
-        layout.addWidget(self.scan_log, stretch=1)
-        
-        # Кнопка сохранения лога
-        self.save_log_btn = QPushButton("💾 Сохранить лог")
-        self.save_log_btn.setStyleSheet(BUTTON_SMALL_STYLE)
-        self.save_log_btn.setEnabled(False)
-        self.save_log_btn.clicked.connect(self._save_scan_log)
-        layout.addWidget(self.save_log_btn, alignment=Qt.AlignmentFlag.AlignRight)
+        scan_layout.addStretch()
+
+        # Кнопка "Добавить в список" (активна после сканирования)
+        self.add_to_list_btn = QPushButton("Добавить в список")
+        self.add_to_list_btn.setIcon(qta.icon('ri.file-add-fill', color='#000000', scale_factor=0.8))
+        self.add_to_list_btn.setIconSize(QSize(18, 18))
+        self.add_to_list_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLOR_BG_TERTIARY};
+                color: {COLOR_TEXT_DISABLED};
+            }}
+        """)
+        self.add_to_list_btn.setEnabled(False)
+        self.add_to_list_btn.clicked.connect(self._add_to_list)
+        scan_layout.addWidget(self.add_to_list_btn)
+
+        layout.addLayout(scan_layout)
 
         return widget
 
@@ -546,22 +689,6 @@ class SettingsDialog(QDialog):
 
         filter_layout.addStretch()
         
-        # Кнопки управления
-        self.log_refresh_btn = QPushButton("🔄 Обновить")
-        self.log_refresh_btn.setStyleSheet(BUTTON_SMALL_STYLE)
-        self.log_refresh_btn.clicked.connect(self._refresh_app_logs)
-        filter_layout.addWidget(self.log_refresh_btn)
-        
-        self.log_clear_btn = QPushButton("🗑 Очистить")
-        self.log_clear_btn.setStyleSheet(BUTTON_SMALL_STYLE)
-        self.log_clear_btn.clicked.connect(self._clear_app_logs)
-        filter_layout.addWidget(self.log_clear_btn)
-        
-        self.log_save_btn = QPushButton("💾 Сохранить")
-        self.log_save_btn.setStyleSheet(BUTTON_SMALL_STYLE)
-        self.log_save_btn.clicked.connect(self._save_app_logs)
-        filter_layout.addWidget(self.log_save_btn)
-        
         self.log_autoscroll_checkbox = QCheckBox("Автопрокрутка")
         self.log_autoscroll_checkbox.setStyleSheet(CHECKBOX_STYLE)
         self.log_autoscroll_checkbox.setChecked(True)
@@ -572,7 +699,7 @@ class SettingsDialog(QDialog):
         # --- Поле логов ---
         self.app_log_view = QTextEdit()
         self.app_log_view.setReadOnly(True)
-        self.app_log_view.setStyleSheet(LOG_TEXT_STYLE)
+        self.app_log_view.setStyleSheet(LOG_TEXT_STYLE + SCROLLBAR_STYLE)
         self.app_log_view.setMinimumHeight(250)
         self.app_log_view.setPlaceholderText(
             "Здесь отображаются логи приложения (app.log).\n"
@@ -585,6 +712,87 @@ class SettingsDialog(QDialog):
             "  CRITICAL — критические ошибки (ярко-красный)"
         )
         layout.addWidget(self.app_log_view, stretch=1)
+        
+        # --- Кнопки управления (ПОД логом) ---
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        # Обновить
+        self.log_refresh_btn = QPushButton("Обновить")
+        self.log_refresh_btn.setIcon(qta.icon('mdi.refresh', color='#000000', scale_factor=0.8))
+        self.log_refresh_btn.setIconSize(QSize(18, 18))
+        self.log_refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+        """)
+        self.log_refresh_btn.clicked.connect(self._refresh_app_logs)
+        btn_layout.addWidget(self.log_refresh_btn)
+
+        # Очистить
+        self.log_clear_btn = QPushButton("Очистить")
+        self.log_clear_btn.setIcon(qta.icon('mdi.delete-empty', color='#000000', scale_factor=0.8))
+        self.log_clear_btn.setIconSize(QSize(18, 18))
+        self.log_clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+        """)
+        self.log_clear_btn.clicked.connect(self._clear_app_logs)
+        btn_layout.addWidget(self.log_clear_btn)
+        
+        # Сохранить
+        self.log_save_btn = QPushButton("Сохранить")
+        self.log_save_btn.setIcon(qta.icon('fa5.save', color='#000000', scale_factor=0.8))
+        self.log_save_btn.setIconSize(QSize(18, 18))
+        self.log_save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_PRIMARY};
+                font-size: 11px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                spacing: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_ACCENT_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLOR_ACCENT_PRESSED};
+            }}
+        """)
+        self.log_save_btn.clicked.connect(self._save_app_logs)
+        btn_layout.addWidget(self.log_save_btn)
+        
+        layout.addLayout(btn_layout)
         
         # --- Статус строка ---
         self.log_status_label = QLabel("Лог-файл: app.log | Строк: 0")
@@ -671,6 +879,7 @@ class SettingsDialog(QDialog):
         # UI в режим сканирования
         self.scan_btn.setEnabled(False)
         self.scan_cancel_btn.setEnabled(True)
+        self.add_to_list_btn.setEnabled(False)
         self.scan_progress.setVisible(True)
         self.scan_progress.setRange(0, 0)  # Бесконечный
         
@@ -680,6 +889,8 @@ class SettingsDialog(QDialog):
         self._scan_worker.progress.connect(self._on_scan_progress)
         self._scan_worker.finished_scan.connect(self._on_scan_finished)
         self._scan_worker.error.connect(self._on_scan_error)
+        self._scan_worker.archive_found.connect(self._on_archive_found)
+        self._found_archives: list = []  # Собираем найденные архивы
         self._scan_worker.start()
 
     def _cancel_scan(self):
@@ -687,6 +898,26 @@ class SettingsDialog(QDialog):
         if self._scan_worker and self._scan_worker.isRunning():
             self._scan_worker.cancel()
             self._append_log("Отмена сканирования...", "WARNING")
+
+    def _on_archive_found(self, candidate):
+        """Сохранить найденный архив для передачи в таблицу."""
+        # Форматируем дату
+        date_str = "—"
+        if candidate.record_date:
+            try:
+                d = candidate.record_date
+                date_str = f"{d[6:8]}.{d[4:6]}.{d[0:4]}"
+            except Exception:
+                date_str = candidate.record_date
+        
+        archive = {
+            'turbine': candidate.wtg_id or "Unknown",
+            'date_str': date_str,
+            'size': f"{candidate.file_size_kb:.0f} КБ",
+            'path': str(candidate.path),
+            'filename': candidate.filename
+        }
+        self._found_archives.append(archive)
 
     def _on_scan_progress(self, current: int, total: int):
         """Обновить прогресс сканирования."""
@@ -707,6 +938,22 @@ class SettingsDialog(QDialog):
             f"Сканирование завершено. Всего: {total}, обработано: {processed}, ошибок: {errors}",
             "SUCCESS"
         )
+
+        # Активируем кнопку "Добавить в список" если есть найденные архивы
+        if self._found_archives:
+            self._append_log(f"Найдено архивов: {len(self._found_archives)}. Нажмите 'Добавить в список' для загрузки.", "SUCCESS")
+            self.add_to_list_btn.setEnabled(True)
+
+    def _add_to_list(self):
+        """Добавить найденные архивы в список и перейти на Home."""
+        if self._found_archives:
+            self._append_log(f"Добавлено в список: {len(self._found_archives)} архивов", "SUCCESS")
+            self.archives_found.emit(self._found_archives)
+            self._found_archives = []
+
+        self.add_to_list_btn.setEnabled(False)
+        self.switch_to_home.emit()
+        self.accept()
 
     def _on_scan_error(self, error_msg: str):
         """Обработка ошибки сканирования."""
@@ -894,8 +1141,10 @@ class SettingsDialog(QDialog):
         # Очищаем старые индикаторы
         while self.modules_layout.count():
             item = self.modules_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         # Модули для проверки
         modules = [
@@ -933,7 +1182,7 @@ class SettingsDialog(QDialog):
                 import pyqtgraph
                 return True
             elif name == "PostgreSQL":
-                return self.repository_switcher and self.repository_switcher.mode == 'postgres'
+                return bool(self.repository_switcher and self.repository_switcher.mode == 'postgres')
             elif name == "asyncpg":
                 import asyncpg
                 return True
@@ -957,8 +1206,8 @@ class SettingsDialog(QDialog):
         self.db_port_input.setValue(settings.db_port)
         self.db_user_input.setText(settings.db_user)
         self.db_name_input.setText(settings.db_name)
-        self.db_retries_input.setValue(settings.db_connect_retries)
-        self.db_retry_delay_input.setValue(settings.db_connect_retry_delay)
+        self.db_retries_input.setValue(int(settings.db_connect_retries))
+        self.db_retry_delay_input.setValue(int(settings.db_connect_retry_delay))
         self.db_enabled_checkbox.setChecked(settings.use_database)
         
         # Обновляем статус
