@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local configs & secrets
+.env
+app_settings.json
+
+# Build artifacts
+*.exe
+*.spec
+run.log
+app.log
+Prometeus.txt
+IMPLEMENTATION_SUMMARY_v1.3.md
+
+# Project artifacts
+fix_parser2.py
+web-annexure [codepen]/
