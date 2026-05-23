@@ -21,7 +21,7 @@ app/
 ├── build.spec                # Конфигурация PyInstaller
 ├── install_and_run.ps1       # Скрипт установки и запуска
 ├── build_exe.ps1             # Скрипт сборки EXE
-├── smp12c_vibrodiag/         # Исходный код (~610 строк)
+├── kwf_prometheus/         # Исходный код (~610 строк)
 │   ├── main.py               # Точка входа
 │   ├── gui/                  # GUI компоненты
 │   ├── parsers/              # Парсер .rd2
@@ -65,7 +65,7 @@ pip install -r requirements.txt
 powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
 
 # Или вручную
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 ### Шаг 3: Сборка EXE
@@ -75,7 +75,7 @@ python -m smp12c_vibrodiag.main
 powershell.exe -ExecutionPolicy Bypass -File .\build_exe.ps1
 
 # Или вручную
-pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" kwf_prometheus/main.py
 ```
 
 Результат: `dist\KWF_Prometheus.exe`
@@ -157,7 +157,7 @@ SENSOR_01_FILTER_W.rd2 — Отфильтрованные
 ## 📝 Структура кода
 
 ```
-smp12c_vibrodiag/
+kwf_prometheus/
 ├── main.py                    # Точка входа (30 строк)
 ├── gui/
 │   ├── main_window.py         # Главное окно (160 строк)
@@ -181,10 +181,10 @@ smp12c_vibrodiag/
 
 ```powershell
 # Один EXE файл (рекомендуется)
-pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" kwf_prometheus/main.py
 
 # С иконкой (если есть icon.ico)
-pyinstaller --onefile --windowed --name "KWF_Prometheus" --icon=icon.ico smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" --icon=icon.ico kwf_prometheus/main.py
 
 # Использовать build.spec
 pyinstaller --clean build.spec

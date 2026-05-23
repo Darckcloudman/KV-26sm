@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['smp12c_vibrodiag\\main.py'],
+    ['kwf_prometheus\\main.py'],
     pathex=[],
     binaries=[],
     datas=[('test_data', 'test_data')],

@@ -43,7 +43,7 @@ if ($retryCount -eq $maxRetries) {
 Write-Host ""
 Write-Host "3. Running Alembic migrations..." -ForegroundColor Yellow
 $env:PYTHONPATH = "."
-alembic -c smp12c_vibrodiag/dal/alembic.ini upgrade head
+alembic -c kwf_prometheus/dal/alembic.ini upgrade head
 if ($LASTEXITCODE -ne 0) {
     Write-Host "   Error: Migration failed" -ForegroundColor Red
     exit 1

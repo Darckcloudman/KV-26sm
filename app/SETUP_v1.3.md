@@ -8,7 +8,7 @@
 
 ```bash
 cd app
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 ### Вариант 2: Режим PostgreSQL
@@ -72,7 +72,7 @@ CREATE DATABASE vibrodiag;
 #### 5. Запустите приложение
 
 ```bash
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 Таблицы будут созданы автоматически при первом запуске.
@@ -84,7 +84,7 @@ python -m smp12c_vibrodiag.main
 ### 1. Проверка подключения к БД
 
 ```bash
-python -m smp12c_vibrodiag.dal.utils check
+python -m kwf_prometheus.dal.utils check
 ```
 
 Ожидаемый вывод:
@@ -137,7 +137,7 @@ python migrate_archives.py --path C:/Archives/WindTurbines
 ### Создать новую миграцию
 
 ```bash
-cd app/smp12c_vibrodiag/dal
+cd app/kwf_prometheus/dal
 alembic revision --autogenerate -m "Описание изменений"
 ```
 
@@ -236,7 +236,7 @@ pip install -r requirements.txt
 
 Если нужно пересоздать:
 ```bash
-python -m smp12c_vibrodiag.dal.utils drop
+python -m kwf_prometheus.dal.utils drop
 # Затем перезапустите приложение
 ```
 
@@ -305,6 +305,6 @@ psql -U postgres vibrodiag < backup.sql
 При возникновении проблем:
 
 1. Проверьте логи приложения
-2. Запустите `python -m smp12c_vibrodiag.dal.utils check`
+2. Запустите `python -m kwf_prometheus.dal.utils check`
 3. Проверьте настройки в `.env`
 4. Убедитесь, что PostgreSQL запущен

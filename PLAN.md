@@ -42,7 +42,7 @@ app/
 ├── README.md                         # Инструкция по сборке
 ├── requirements.txt                  # Зависимости
 ├── build.spec                        # PyInstaller конфигурация
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── __init__.py
 │   ├── main.py                       # Точка входа
 │   ├── gui/
@@ -86,17 +86,17 @@ pip install numpy scipy pandas matplotlib PyQt5 pyinstaller
 ### Этап 2: Создание структуры проекта (15 минут)
 
 **Задачи:**
-1. Создать каталоги `smp12c_vibrodiag/gui`, `parsers`, `analysis`, `utils`
+1. Создать каталоги `kwf_prometheus/gui`, `parsers`, `analysis`, `utils`
 2. Создать `__init__.py` в каждом каталоге
 3. Скопировать тестовые данные из `analysis/test_data/`
 
 **Команды:**
 ```powershell
 New-Item -ItemType Directory -Force `
-    smp12c_vibrodiag/gui, `
-    smp12c_vibrodiag/parsers, `
-    smp12c_vibrodiag/analysis, `
-    smp12c_vibrodiag/utils, `
+    kwf_prometheus/gui, `
+    kwf_prometheus/parsers, `
+    kwf_prometheus/analysis, `
+    kwf_prometheus/utils, `
     test_data
 
 # Скопировать тестовые файлы
@@ -107,7 +107,7 @@ Copy-Item "..\analysis\test_data\*.rd2" -Destination "test_data\" -Recurse
 
 ### Этап 3: Реализация парсера .rd2 (1 час)
 
-**Файл:** `smp12c_vibrodiag/parsers/rd2_parser.py`
+**Файл:** `kwf_prometheus/parsers/rd2_parser.py`
 
 **Функционал:**
 - Класс `RD2Parser` для чтения и парсинга файлов .rd2/.rw2
@@ -133,7 +133,7 @@ Number of Configuration, 188, Configuration Table Version, 1802, Layout Version,
 
 ### Этап 4: Реализация анализатора вибраций (1 час)
 
-**Файл:** `smp12c_vibrodiag/analysis/vibration_analyzer.py`
+**Файл:** `kwf_prometheus/analysis/vibration_analyzer.py`
 
 **Классы:**
 - `VibrationAnalyzer` — статические методы для анализа
@@ -241,7 +241,7 @@ class FileHandler:
 block_cipher = None
 
 a = Analysis(
-    ['smp12c_vibrodiag/main.py'],
+    ['kwf_prometheus/main.py'],
     pathex=[],
     binaries=[],
     datas=[
@@ -317,7 +317,7 @@ coll = COLLECT(
 ```powershell
 pyinstaller --clean build.spec
 # Или напрямую:
-pyinstaller --onefile --windowed --name "KWF_Prometheus" --icon=icon.ico smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" --icon=icon.ico kwf_prometheus/main.py
 ```
 
 ---
@@ -402,10 +402,10 @@ python -m venv venv
 pip install -r requirements.txt
 
 # 4. Запустить приложение (режим разработки)
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 
 # 5. Собрать EXE
-pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" kwf_prometheus/main.py
 
 # 6. Найти EXE в dist/KWF_Prometheus.exe
 ```

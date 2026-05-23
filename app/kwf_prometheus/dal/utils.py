@@ -30,13 +30,13 @@ async def check_database_connection():
     try:
         connected = await db_manager.health_check()
         if connected:
-            print(f"[OK] Подключение к БД '{settings.db_name}' успешно")
+            print(f"✓ Подключение к БД '{settings.db_name}' успешно")
         else:
-            print(f"[FAIL] Не удалось подключиться к БД")
+            print(f"✗ Не удалось подключиться к БД")
         await db_manager.close()
         return connected
     except Exception as e:
-        print(f"[ERROR] Ошибка подключения: {e}")
+        print(f"✗ Ошибка подключения: {e}")
         return False
 
 
@@ -57,18 +57,18 @@ async def drop_all_tables():
     
     try:
         await db_manager.drop_db()
-        print("[OK] Все таблицы удалены")
+        print("✓ Все таблицы удалены")
         await db_manager.close()
     except Exception as e:
-        print(f"[ERROR] Ошибка: {e}")
+        print(f"✗ Ошибка: {e}")
 
 
 def main():
     """CLI для утилит DAL."""
     if len(sys.argv) < 2:
         print("Использование:")
-        print("  python -m smp12c_vibrodiag.dal.utils check  - проверка подключения")
-        print("  python -m smp12c_vibrodiag.dal.utils drop   - удалить все таблицы")
+        print("  python -m kwf_prometheus.dal.utils check  - проверка подключения")
+        print("  python -m kwf_prometheus.dal.utils drop   - удалить все таблицы")
         return
     
     command = sys.argv[1]

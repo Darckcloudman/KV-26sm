@@ -19,8 +19,8 @@ from PyQt5.QtGui import QFont, QPixmap
 from .canvas import MplCanvas
 from .upload_info_screen import UploadInfoScreen, SENSOR_DESCRIPTIONS
 from .raw_data_screen import RawDataScreen
-from smp12c_vibrodiag.parsers.rd2_parser import process_rd2_file
-from smp12c_vibrodiag.utils.file_handler import FileHandler
+from kwf_prometheus.parsers.rd2_parser import process_rd2_file
+from kwf_prometheus.utils.file_handler import FileHandler
 
 from PyQt5.QtWidgets import QApplication
 

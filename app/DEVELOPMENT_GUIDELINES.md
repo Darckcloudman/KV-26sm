@@ -325,7 +325,7 @@ python -m pytest tests/ -v
 
 ### Покрытие:
 ```bash
-python -m pytest tests/ --cov=smp12c_vibrodiag --cov-report=html
+python -m pytest tests/ --cov=kwf_prometheus --cov-report=html
 ```
 
 ---
@@ -502,7 +502,7 @@ sensor_serial: Mapped[Optional[str]] = mapped_column(
 ### Утилита проверки
 
 ```bash
-python -m smp12c_vibrodiag.utils.check_sensor_serial_uniqueness D:\WindFarmData
+python -m kwf_prometheus.utils.check_sensor_serial_uniqueness D:\WindFarmData
 ```
 
 **Вывод:**

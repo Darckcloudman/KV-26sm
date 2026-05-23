@@ -18,9 +18,9 @@ from pathlib import Path
 # Добавляем путь к модулю приложения
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from smp12c_vibrodiag.dal.config import settings
-from smp12c_vibrodiag.dal.database import DatabaseManager
-from smp12c_vibrodiag.dal.repositories.postgres import PostgresRepository
+from kwf_prometheus.dal.config import settings
+from kwf_prometheus.dal.database import DatabaseManager
+from kwf_prometheus.dal.repositories.postgres import PostgresRepository
 
 
 async def migrate_archives(archive_dir: Path, dry_run: bool = False):

@@ -214,7 +214,7 @@ await db_manager.init_db()  # Создаёт таблицы
 ### Ручные (Alembic)
 
 ```bash
-cd app/smp12c_vibrodiag/dal
+cd app/kwf_prometheus/dal
 
 # Создать миграцию
 alembic revision --autogenerate -m "Description"
@@ -311,13 +311,13 @@ SQLAlchemy будет выводить все SQL-запросы.
 ### Проверка подключения
 
 ```bash
-python -m smp12c_vibrodiag.dal.utils check
+python -m kwf_prometheus.dal.utils check
 ```
 
 ### Удаление таблиц
 
 ```bash
-python -m smp12c_vibrodiag.dal.utils drop
+python -m kwf_prometheus.dal.utils drop
 ```
 
 ---
@@ -383,7 +383,7 @@ python setup.py build_exe
 
 ### "No module named 'dal'"
 
-**Решение:** Проверьте, что dal/ находится внутри smp12c_vibrodiag/
+**Решение:** Проверьте, что dal/ находится внутри kwf_prometheus/
 
 ### "could not connect to server"
 

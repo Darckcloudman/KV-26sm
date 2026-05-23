@@ -17,7 +17,7 @@
 
 ```powershell
 cd D:\Сoding\pyton_pro\app
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 > **PowerShell:** При ошибке `PSSecurityException` используйте `powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1`
@@ -146,7 +146,7 @@ test_data/
 ```powershell
 # Очистка и пересборка
 Remove-Item -Path "dist", "build" -Recurse -Force -ErrorAction SilentlyContinue
-pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" kwf_prometheus/main.py
 
 # Копирование EXE
 Copy-Item "dist\KWF_Prometheus.exe" -Destination "D:\Сoding\pyton_pro\KWF_Prometheus.exe" -Force

@@ -57,5 +57,5 @@ Write-Host "   Dependencies installed" -ForegroundColor Green
 Write-Host ""
 Write-Host "6. Launching application..." -ForegroundColor Yellow
 Write-Host ""
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 

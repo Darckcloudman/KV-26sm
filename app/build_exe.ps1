@@ -53,7 +53,7 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
 python -m PyInstaller --onefile --windowed --name "KWF_Prometheus" `
     --add-data "test_data;test_data" `
-    smp12c_vibrodiag/main.py
+    kwf_prometheus/main.py
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

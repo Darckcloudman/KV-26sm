@@ -8,8 +8,8 @@ import logging
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 
-from smp12c_vibrodiag.dal.logger import setup_logging
-from smp12c_vibrodiag.dal.config import settings
+from kwf_prometheus.dal.logger import setup_logging
+from kwf_prometheus.dal.config import settings
 
 
 def main():
@@ -22,16 +22,17 @@ def main():
     
     # Создание приложения
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")  # Принудительно используем Fusion стиль для консистентности
     app.setApplicationName('KWF Prometheus')
-    app.setApplicationVersion('1.3')
+    app.setApplicationVersion('1.4.1')
     app.setOrganizationName('KWF')
     
     # Применение стилей (закомментировано для отладки)
-    # from smp12c_vibrodiag.gui.styles import STYLESHEET
+    # from kwf_prometheus.gui.styles import STYLESHEET
     # app.setStyleSheet(STYLESHEET)
     
     # Импортируем MainWindow после настройки QApplication
-    from smp12c_vibrodiag.gui.main_window import MainWindow
+    from kwf_prometheus.gui.main_window import MainWindow
     
     # Создание главного окна
     window = MainWindow()

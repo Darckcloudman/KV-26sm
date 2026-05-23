@@ -8,7 +8,7 @@
 
 ## Экран «Home» (v1.2) — полная переработка
 
-**Файл:** `smp12c_vibrodiag/gui/home_screen.py`
+**Файл:** `kwf_prometheus/gui/home_screen.py`
 
 ### Компоненты
 
@@ -219,7 +219,7 @@ test_data/zip/
 ```powershell
 cd D:\Сoding\pyton_pro\app
 Remove-Item -Path "dist", "build" -Recurse -Force
-pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" kwf_prometheus/main.py
 Copy-Item "dist\KWF_Prometheus.exe" -Destination "D:\Сoding\pyton_pro\" -Force
 ```
 

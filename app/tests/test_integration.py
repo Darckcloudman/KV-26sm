@@ -43,7 +43,7 @@ def event_loop():
 @pytest.fixture(scope="session")
 def test_settings():
     """Load test settings from .env.test."""
-    from smp12c_vibrodiag.dal.config import Settings
+    from kwf_prometheus.dal.config import Settings
     
     # Try to load from .env.test first
     env_test = Path(".env.test")
@@ -64,7 +64,7 @@ def test_settings():
 @pytest.fixture(scope="session")
 async def db_manager(test_settings):
     """Create database manager and initialize tables."""
-    from smp12c_vibrodiag.dal.database import DatabaseManager
+    from kwf_prometheus.dal.database import DatabaseManager
     
     manager = DatabaseManager(test_settings)
     
@@ -95,14 +95,14 @@ async def db_session(db_manager):
 @pytest.fixture
 def repository(db_manager, test_settings):
     """Create PostgresRepository instance."""
-    from smp12c_vibrodiag.dal.repositories.postgres import PostgresRepository
+    from kwf_prometheus.dal.repositories.postgres import PostgresRepository
     return PostgresRepository(db_manager, test_settings.archive_storage_path)
 
 
 @pytest.fixture
 def persistence_service(repository):
     """Create DataPersistenceService instance."""
-    from smp12c_vibrodiag.dal.persistence_service import DataPersistenceService
+    from kwf_prometheus.dal.persistence_service import DataPersistenceService
     return DataPersistenceService(repository)
 
 
@@ -166,7 +166,7 @@ class TestSaveSingleRD2:
     async def test_save_single_rd2(self, persistence_service, sample_rd2_file, db_session):
         """Test 2.1: Save single .rd2 and verify DB records."""
         from sqlalchemy import select
-        from smp12c_vibrodiag.dal.models import Turbine, Archive, SensorData, AnalysisCache
+        from kwf_prometheus.dal.models import Turbine, Archive, SensorData, AnalysisCache
         
         # Act: Save the file
         result = await persistence_service.save_archive(sample_rd2_file)
@@ -214,7 +214,7 @@ class TestSaveSingleRD2:
     async def test_turbine_device_info(self, persistence_service, sample_rd2_file, db_session):
         """Test that device info (serial, MAC) is extracted and saved."""
         from sqlalchemy import select
-        from smp12c_vibrodiag.dal.models import Turbine
+        from kwf_prometheus.dal.models import Turbine
         
         # Save file
         result = await persistence_service.save_archive(sample_rd2_file)
@@ -242,7 +242,7 @@ class TestSaveZipArchive:
     async def test_save_zip_archive(self, persistence_service, sample_zip_archive, db_session):
         """Test 2.2: Save ZIP archive and verify all .rd2 files processed."""
         from sqlalchemy import select, func
-        from smp12c_vibrodiag.dal.models import Turbine, Archive
+        from kwf_prometheus.dal.models import Turbine, Archive
         
         # Count files in ZIP
         with zipfile.ZipFile(sample_zip_archive, 'r') as zf:
@@ -331,7 +331,7 @@ class TestDeviceIdentification:
     async def test_same_device_same_turbine(self, persistence_service, sample_rd2_file, db_session):
         """Test 2.4: Same device serial maps to same turbine."""
         from sqlalchemy import select
-        from smp12c_vibrodiag.dal.models import Turbine
+        from kwf_prometheus.dal.models import Turbine
         
         # Save first file
         result1 = await persistence_service.save_archive(sample_rd2_file)
@@ -362,7 +362,7 @@ class TestAutoScan:
     
     async def test_scan_directory(self, persistence_service, temp_storage, sample_zip_archive):
         """Test 2.5: Scan directory and process archives."""
-        from smp12c_vibrodiag.dal.auto_scan_service import AutoScanService
+        from kwf_prometheus.dal.auto_scan_service import AutoScanService
         
         # Copy sample ZIP to temp storage (simulate hierarchical structure)
         year_month = temp_storage / "202509"
@@ -398,7 +398,7 @@ class TestAutoScan:
     
     async def test_incremental_scan(self, persistence_service, temp_storage, sample_zip_archive):
         """Test incremental scan processes only new files."""
-        from smp12c_vibrodiag.dal.auto_scan_service import AutoScanService
+        from kwf_prometheus.dal.auto_scan_service import AutoScanService
         
         # Setup temp storage
         day_dir = temp_storage / "202509" / "03"
@@ -527,7 +527,7 @@ class TestSensorSerialUniqueness:
     
     def test_sensor_serial_extraction(self, sample_rd2_file):
         """Test 2.9: Extract sensor_serial from .rd2 file."""
-        from smp12c_vibrodiag.parsers.rd2_parser import RD2Parser
+        from kwf_prometheus.parsers.rd2_parser import RD2Parser
         
         parser = RD2Parser(str(sample_rd2_file))
         data = parser.parse()
@@ -538,7 +538,7 @@ class TestSensorSerialUniqueness:
     
     def test_sensor_serial_matches_record_number(self, sample_rd2_file):
         """Test sensor_serial equals record_number (first field)."""
-        from smp12c_vibrodiag.parsers.rd2_parser import RD2Parser
+        from kwf_prometheus.parsers.rd2_parser import RD2Parser
         
         parser = RD2Parser(str(sample_rd2_file))
         data = parser.parse()

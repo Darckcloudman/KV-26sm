@@ -4,7 +4,7 @@
 
 ### 1. Создан Data Access Layer (DAL)
 
-#### Пакет `smp12c_vibrodiag/dal/`
+#### Пакет `kwf_prometheus/dal/`
 
 **Файлы конфигурации:**
 - ✅ `__init__.py` - экспорт настроек
@@ -114,7 +114,7 @@ app/
 ├── IMPLEMENTATION_SUMMARY.md     ← НОВОЕ: Этот файл
 ├── PROJECT_SUMMARY.md            ← ОБНОВЛЕНО: Добавлена v1.3
 │
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── main.py                   ← ОБНОВЛЕНО: Версия 1.3
 │   │
 │   ├── dal/                      ← НОВЫЙ ПАКЕТ
@@ -207,7 +207,7 @@ app/
 
 ```bash
 cd app
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 **Ничего настраивать не нужно!**
@@ -223,7 +223,7 @@ DB_PASSWORD=your_password
 createdb -U postgres vibrodiag
 
 # 3. Запустить
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 ---
@@ -334,5 +334,5 @@ python -m smp12c_vibrodiag.main
 
 1. Прочитайте [SETUP_v1.3.md](SETUP_v1.3.md)
 2. Проверьте [DAL_GUIDE.md](DAL_GUIDE.md)
-3. Запустите `python -m smp12c_vibrodiag.dal.utils check`
+3. Запустите `python -m kwf_prometheus.dal.utils check`
 4. Изучите логи приложения

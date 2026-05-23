@@ -203,9 +203,9 @@
 
 ```bash
 cd app
-python -m py_compile smp12c_vibrodiag/gui/settings_dialog.py
-python -m py_compile smp12c_vibrodiag/dal/repository_switcher.py
-python -m py_compile smp12c_vibrodiag/parsers/adaptive_archive_scanner.py
+python -m py_compile kwf_prometheus/gui/settings_dialog.py
+python -m py_compile kwf_prometheus/dal/repository_switcher.py
+python -m py_compile kwf_prometheus/parsers/adaptive_archive_scanner.py
 ```
 
 **Ожидаемый результат**: Нет синтаксических ошибок.
@@ -213,9 +213,9 @@ python -m py_compile smp12c_vibrodiag/parsers/adaptive_archive_scanner.py
 ### Импорты
 
 ```bash
-python -c "from smp12c_vibrodiag.gui.settings_dialog import SettingsDialog"
-python -c "from smp12c_vibrodiag.dal.repository_switcher import RepositorySwitcher"
-python -c "from smp12c_vibrodiag.parsers.adaptive_archive_scanner import AdaptiveArchiveScanner"
+python -c "from kwf_prometheus.gui.settings_dialog import SettingsDialog"
+python -c "from kwf_prometheus.dal.repository_switcher import RepositorySwitcher"
+python -c "from kwf_prometheus.parsers.adaptive_archive_scanner import AdaptiveArchiveScanner"
 ```
 
 **Ожидаемый результат**: Все импорты работают.

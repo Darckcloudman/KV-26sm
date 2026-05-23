@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock
 import numpy as np
 
-from smp12c_vibrodiag.reports.pdf_generator import PDFReportGenerator
+from kwf_prometheus.reports.pdf_generator import PDFReportGenerator
 
 
 class MockParser:

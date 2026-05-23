@@ -402,7 +402,7 @@ python -m pytest tests/ -v
 
 ### Покрытие:
 ```bash
-python -m pytest tests/ --cov=smp12c_vibrodiag --cov-report=html
+python -m pytest tests/ --cov=kwf_prometheus --cov-report=html
 ```
 
 ---

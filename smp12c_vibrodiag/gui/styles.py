@@ -1,1 +1,0 @@
-﻿cd app; .\venv\Scripts\python.exe -m smp12c_vibrodiag.main

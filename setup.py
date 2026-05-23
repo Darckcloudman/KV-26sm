@@ -14,7 +14,7 @@ build_exe_options = {
     ],
     "includes": ["numpy", "scipy", "PySide6", "pyqtgraph", "qtawesome"],
     "include_files": [
-        ("smp12c_vibrodiag/gui/styles.py", "smp12c_vibrodiag/gui/styles.py"),
+        ("kwf_prometheus/gui/styles.py", "kwf_prometheus/gui/styles.py"),
     ],
     "excludes": [
         "tkinter",
@@ -39,7 +39,7 @@ base = "gui" if sys.platform == "win32" else None
 
 executables = [
     Executable(
-        "smp12c_vibrodiag/main.py",
+        "kwf_prometheus/main.py",
         base=base,
         target_name="KWF_Prometheus.exe",
         icon=None

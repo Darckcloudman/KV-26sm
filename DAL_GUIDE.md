@@ -44,7 +44,7 @@
 
 ```bash
 cd app
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 ### 2. Режим PostgreSQL
@@ -75,7 +75,7 @@ createdb -U postgres vibrodiag
 #### Шаг 4: Запустите приложение
 
 ```bash
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 Таблицы будут созданы автоматически при первом запуске.
@@ -89,7 +89,7 @@ python -m smp12c_vibrodiag.main
 ### Ручные миграции (Alembic)
 
 ```bash
-cd app/smp12c_vibrodiag/dal
+cd app/kwf_prometheus/dal
 
 # Создать новую миграцию
 alembic revision --autogenerate -m "Description"
@@ -283,10 +283,10 @@ async def load_archive(self, path: Path) -> bool:
 
 ```bash
 # Проверка подключения к БД
-python -m smp12c_vibrodiag.dal.utils check
+python -m kwf_prometheus.dal.utils check
 
 # Удаление всех таблиц (осторожно!)
-python -m smp12c_vibrodiag.dal.utils drop
+python -m kwf_prometheus.dal.utils drop
 ```
 
 ## Поддержка
@@ -296,4 +296,4 @@ python -m smp12c_vibrodiag.dal.utils drop
 1. Проверьте `.env` настройки
 2. Убедитесь, что PostgreSQL запущен
 3. Проверьте логи приложения
-4. Запустите `python -m smp12c_vibrodiag.dal.utils check`
+4. Запустите `python -m kwf_prometheus.dal.utils check`

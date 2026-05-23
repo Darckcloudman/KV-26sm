@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import Mock, MagicMock
 import numpy as np
 
-from smp12c_vibrodiag.exporters.csv_exporter import CSVExporter
-from smp12c_vibrodiag.exporters.excel_exporter import ExcelExporter
+from kwf_prometheus.exporters.csv_exporter import CSVExporter
+from kwf_prometheus.exporters.excel_exporter import ExcelExporter
 
 
 class MockParser:

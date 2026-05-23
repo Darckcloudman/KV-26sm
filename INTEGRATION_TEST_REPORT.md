@@ -24,7 +24,7 @@
 
 ### 2.1 Критическая: недостижимый код в `postgres.py`
 
-**Файл:** `app/smp12c_vibrodiag/dal/repositories/postgres.py`
+**Файл:** `app/kwf_prometheus/dal/repositories/postgres.py`
 **Строки:** 137–149
 
 **Проблема:** После `return result` в блоке проверки `parser._parsed` весь последующий код загрузки в БД был смещён на 1 уровень отступа вправо, делая его недостижимым. Приложение "успешно" парсило файл, но никогда не сохраняло данные в PostgreSQL.
@@ -43,7 +43,7 @@ if not parser or not parser._parsed:
 
 ### 2.2 Критическая: отсутствует `sensor_serial` в парсере
 
-**Файл:** `app/smp12c_vibrodiag/parsers/rd2_parser.py`
+**Файл:** `app/kwf_prometheus/parsers/rd2_parser.py`
 
 **Проблема:** Поле `sensor_serial` (первое поле строки 1 .rd2 файла) не извлекалось парсером, хотя использовалось в `PostgresRepository` и в тестах уникальности.
 
@@ -54,7 +54,7 @@ self.metadata['sensor_serial'] = line1[0]  # v1.4: серийный номер �
 
 ### 2.3 Средняя: отсутствует `logger` в `home_screen.py`
 
-**Файл:** `app/smp12c_vibrodiag/gui/home_screen.py`
+**Файл:** `app/kwf_prometheus/gui/home_screen.py`
 
 **Проблема:** Метод `_on_load_result` использовал `logger.error()` / `logger.info()`, но `logger` не был импортирован.
 
@@ -118,7 +118,7 @@ powershell -ExecutionPolicy Bypass -File .\run_integration_tests.ps1
 docker-compose -f docker-compose.test.yml up -d
 
 # 2. Применить миграции
-alembic -c smp12c_vibrodiag/dal/alembic.ini upgrade head
+alembic -c kwf_prometheus/dal/alembic.ini upgrade head
 
 # 3. Запустить тесты
 $env:PYTHONPATH = "."
@@ -195,9 +195,9 @@ UNIQUE(turbine_id, record_datetime, sensor_id, filter_type)
 ## 10. Список изменённых файлов
 
 ```
-app/smp12c_vibrodiag/dal/repositories/postgres.py   ← Исправлены отступы (критично)
-app/smp12c_vibrodiag/parsers/rd2_parser.py           ← +sensor_serial
-app/smp12c_vibrodiag/gui/home_screen.py              ← +import logger
+app/kwf_prometheus/dal/repositories/postgres.py   ← Исправлены отступы (критично)
+app/kwf_prometheus/parsers/rd2_parser.py           ← +sensor_serial
+app/kwf_prometheus/gui/home_screen.py              ← +import logger
 app/tests/test_integration.py                        ← Новый (15 тестов)
 app/.env.test                                        ← Новый
 app/docker-compose.test.yml                          ← Новый

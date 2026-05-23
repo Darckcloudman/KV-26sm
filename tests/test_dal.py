@@ -15,7 +15,7 @@ class TestFileSystemRepository:
     @pytest.fixture
     def repository(self):
         """Создать репозиторий для тестов."""
-        from smp12c_vibrodiag.dal.repositories.file_system import FileSystemRepository
+        from kwf_prometheus.dal.repositories.file_system import FileSystemRepository
         return FileSystemRepository(Path("./test_data"))
     
     @pytest.mark.asyncio
@@ -96,15 +96,15 @@ class TestPostgresRepository:
     @pytest.fixture
     def skip_if_no_db(self):
         """Пропустить если БД не настроена."""
-        from smp12c_vibrodiag.dal.config import settings
+        from kwf_prometheus.dal.config import settings
         if not settings.use_database:
             pytest.skip("PostgreSQL не включен (USE_DATABASE=false)")
     
     @pytest.mark.asyncio
     async def test_database_connection(self, skip_if_no_db):
         """Тест подключения к БД."""
-        from smp12c_vibrodiag.dal.database import DatabaseManager
-        from smp12c_vibrodiag.dal.config import settings
+        from kwf_prometheus.dal.database import DatabaseManager
+        from kwf_prometheus.dal.config import settings
         
         db_manager = DatabaseManager(settings)
         connected = await db_manager.health_check()
@@ -118,7 +118,7 @@ class TestSettings:
     
     def test_settings_default(self):
         """Тест настроек по умолчанию."""
-        from smp12c_vibrodiag.dal.config import settings
+        from kwf_prometheus.dal.config import settings
         
         assert settings.app_version == "1.4.1"
         assert settings.use_database is False
@@ -127,7 +127,7 @@ class TestSettings:
     
     def test_database_url(self):
         """Тест генерации URL подключения."""
-        from smp12c_vibrodiag.dal.config import settings
+        from kwf_prometheus.dal.config import settings
         
         url = settings.database_url
         assert "postgresql+asyncpg://" in url
@@ -135,7 +135,7 @@ class TestSettings:
     
     def test_database_url_sync(self):
         """Тест генерации sync URL."""
-        from smp12c_vibrodiag.dal.config import settings
+        from kwf_prometheus.dal.config import settings
         
         url = settings.database_url_sync
         assert "postgresql+psycopg2://" in url
@@ -146,9 +146,9 @@ class TestRepositoryFactory:
     
     def test_get_file_system_repository(self):
         """Тест создания FileSystemRepository."""
-        from smp12c_vibrodiag.dal.repositories.factory import get_repository
-        from smp12c_vibrodiag.dal.config import settings
-        from smp12c_vibrodiag.dal.repositories.file_system import FileSystemRepository
+        from kwf_prometheus.dal.repositories.factory import get_repository
+        from kwf_prometheus.dal.config import settings
+        from kwf_prometheus.dal.repositories.file_system import FileSystemRepository
         
         # Временно отключаем БД
         original = settings.use_database

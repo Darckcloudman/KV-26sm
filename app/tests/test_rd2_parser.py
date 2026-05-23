@@ -2,7 +2,7 @@
 import unittest
 import numpy as np
 import tempfile
-from smp12c_vibrodiag.parsers.rd2_parser import RD2Parser, VibrationAnalyzer, process_rd2_file
+from kwf_prometheus.parsers.rd2_parser import RD2Parser, VibrationAnalyzer, process_rd2_file
 
 class TestRD2Parser(unittest.TestCase):
     def test_parse_header(self):

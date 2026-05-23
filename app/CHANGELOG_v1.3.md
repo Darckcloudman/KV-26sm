@@ -59,7 +59,7 @@
 app/
 ├── .env                          ← Новый файл конфигурации
 ├── migrate_archives.py           ← Утилита миграции
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── main.py                   ← Обновлена версия
 │   ├── gui/
 │   │   ├── main_window.py        ← Инъекция репозитория
@@ -119,7 +119,7 @@ PySide6>=6.6.0       (было 6.5.0)
 ### Режим файловой системы (по умолчанию)
 ```bash
 # Ничего менять не нужно
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 ### Режим PostgreSQL
@@ -135,7 +135,7 @@ DB_PASSWORD=your_password
 createdb -U postgres vibrodiag
 
 # 3. Запустить
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 ---
@@ -147,7 +147,7 @@ python -m smp12c_vibrodiag.main
 
 ### Ручные (Alembic)
 ```bash
-cd app/smp12c_vibrodiag/dal
+cd app/kwf_prometheus/dal
 alembic revision --autogenerate -m "Description"
 alembic upgrade head
 ```
@@ -167,10 +167,10 @@ python migrate_archives.py --path ./test_data
 
 ```bash
 # Проверка подключения
-python -m smp12c_vibrodiag.dal.utils check
+python -m kwf_prometheus.dal.utils check
 
 # Удаление таблиц (осторожно!)
-python -m smp12c_vibrodiag.dal.utils drop
+python -m kwf_prometheus.dal.utils drop
 ```
 
 ---
@@ -274,7 +274,7 @@ app/
 ├── .env                                          ← Обновлён: LOG_LEVEL, DB_CONNECT_RETRIES
 ├── requirements.txt                              ← Обновлён: +psycopg2-binary
 ├── app.log                                       ← Новый: файл логов
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── main.py                                   ← Обновлён: setup_logging()
 │   ├── dal/
 │   │   ├── logger.py                             ← Новый: модуль логирования
@@ -336,7 +336,7 @@ app/
 ```
 app/
 ├── requirements.txt                              ← +openpyxl, +reportlab
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── exporters/
 │   │   ├── __init__.py                           ← Новый
 │   │   ├── csv_exporter.py                       ← Новый
@@ -388,7 +388,7 @@ app/
 │   ├── test_reports.py                           ← Новый
 │   ├── test_dal.py                               ← Новый
 │   └── test_rd2_parser.py                        ← Новый (существовал)
-└── smp12c_vibrodiag/
+└── kwf_prometheus/
     └── dal/
         └── config.py                             ← SettingsConfigDict
 ```
@@ -570,7 +570,7 @@ app/
 ├── DEVELOPMENT_GUIDELINES.md                    ← Новый: руководство разработчика
 ├── CHANGELOG_v1.3.md                            ← Обновлён: v1.4 раздел
 ├── COLORS.md                                    ← Обновлён: новые экраны
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── dal/
 │   │   ├── alembic/versions/
 │   │   │   └── 002_add_device_info_and_deduplication.py  ← Новый
@@ -727,7 +727,7 @@ app/
 
 ```
 app/
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── dal/
 │   │   ├── persistence_service.py              ← Новый: единый сервис сохранения
 │   │   ├── auto_scan_service.py                ← Новый: автопарсинг хранилища

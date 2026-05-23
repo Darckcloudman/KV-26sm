@@ -5,8 +5,8 @@ Unit-тесты для модулей utils.
 
 import pytest
 import numpy as np
-from smp12c_vibrodiag.utils.conversions import kw_to_mw, kwh_to_gwh
-from smp12c_vibrodiag.utils.vibration_analysis import VibrationAnalyzer
+from kwf_prometheus.utils.conversions import kw_to_mw, kwh_to_gwh
+from kwf_prometheus.utils.vibration_analysis import VibrationAnalyzer
 
 
 class TestConversions:

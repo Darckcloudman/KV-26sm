@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [tool.pyright]
-include = ["smp12c_vibrodiag"]
+include = ["kwf_prometheus"]
 exclude = [
     "**/node_modules",
     "**/.*",
@@ -29,7 +29,7 @@ exclude = [
     ".git",
     "build",
     "dist",
-    "smp12c_vibrodiag/gui/main_window_old.py",
+    "kwf_prometheus/gui/main_window_old.py",
 ]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"
@@ -63,4 +63,4 @@ addopts = "-v --tb=short"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["smp12c_vibrodiag*"]
+include = ["kwf_prometheus*"]

@@ -80,7 +80,7 @@ pip install -r requirements.txt
 ### Запуск в режиме разработки
 
 ```powershell
-python -m smp12c_vibrodiag.main
+python -m kwf_prometheus.main
 ```
 
 ### Сборка EXE
@@ -121,7 +121,7 @@ app/
 ├── setup.py                   # Конфигурация cx_Freeze
 ├── PLAN.md                    # Подробный план разработки
 ├── PROJECT_SUMMARY.md         # Итоговый отчёт
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── __init__.py
 │   ├── main.py                # Точка входа
 │   ├── app_settings.py        # Настройки приложения

@@ -23,7 +23,7 @@
 app/
 ├── .env                          ← Настройки (USE_DATABASE, DB_*)
 ├── migrate_archives.py           ← Утилита миграции архивов в БД
-├── smp12c_vibrodiag/
+├── kwf_prometheus/
 │   ├── dal/                      ← НОВЫЙ DAL слой
 │   │   ├── config.py             ← Настройки из .env
 │   │   ├── database.py           ← DatabaseManager
