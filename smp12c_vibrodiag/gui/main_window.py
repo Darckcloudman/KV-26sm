@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"SMP12C VibroDiag Analyzer v{settings.app_version}")
         self.setMinimumSize(1400, 900)
-        self.resize(1600, 1000)
+        self.resize(1700, 1050)
 
         self.current_file = None
         self.parser = None

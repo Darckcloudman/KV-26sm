@@ -337,7 +337,7 @@ class SensorScheme(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(650, 442)
+        self.setMinimumSize(900, 600)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet("background-color: #000000; border: none;")
 
