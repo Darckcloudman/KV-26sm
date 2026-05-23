@@ -44,7 +44,7 @@ reportReturnType = "error"
 # Не строгие (чтобы не мешали)
 reportMissingTypeStubs = "none"
 reportMissingTypeArgument = "none"
-reportUnknownMemberType = "warning"
+reportUnknownMemberType = "none"
 reportUnknownParameterType = "none"
 reportUnknownVariableType = "none"
 reportMissingImports = "error"
