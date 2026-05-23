@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QThread, QTimer, QSize
 from PySide6.QtGui import QFont, QTextCursor, QIcon
-import qtawesome as qta
+import qtawesome as qta  # type: ignore[import-untyped]
 
 from .ui_styles import (
     COLOR_BG_PRIMARY, COLOR_BG_SECONDARY, COLOR_BG_TERTIARY,
@@ -1181,10 +1181,10 @@ class SettingsDialog(QDialog):
             elif name == "PostgreSQL":
                 return bool(self.repository_switcher and self.repository_switcher.mode == 'postgres')
             elif name == "asyncpg":
-                import asyncpg
+                import asyncpg  # type: ignore[import-untyped]
                 return True
             elif name == "SQLAlchemy":
-                import sqlalchemy
+                import sqlalchemy  # type: ignore[import-untyped]
                 return True
             elif name == "openpyxl":
                 import openpyxl

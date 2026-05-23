@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QFileSystemModel, QFrame
 )
 from PySide6.QtCore import QDir, QSize
-import qtawesome as qta
+import qtawesome as qta  # type: ignore[import-untyped]
 from .styled_message_box import show_warning
 
 
@@ -59,7 +59,7 @@ class ArchiveTreeDialog(QDialog):
 
         # Separator
         sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
+        sep.setFrameShape(QFrame.Shape.VLine)
         sep.setStyleSheet("color: #333333;")
         sep.setFixedWidth(1)
         nav_layout.addWidget(sep)
@@ -96,13 +96,13 @@ class ArchiveTreeDialog(QDialog):
 
         # Tree view
         self.tree_view = QTreeView()
-        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.tree_view.setAlternatingRowColors(False)
         self.tree_view.setAnimated(True)
         self.tree_view.setIndentation(20)
         self.tree_view.setSortingEnabled(True)
         self.tree_view.setHeaderHidden(False)
-        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.tree_view.header().setStretchLastSection(True)
         self.tree_view.setIconSize(QSize(16, 16))
         layout.addWidget(self.tree_view)
@@ -139,7 +139,7 @@ class ArchiveTreeDialog(QDialog):
         self.model = QFileSystemModel()
         self.model.setRootPath("")
         # Show dirs + files, hide dot files
-        self.model.setFilter(QDir.AllDirs | QDir.Files | QDir.NoDotAndDotDot | QDir.Hidden)
+        self.model.setFilter(QDir.Filter.AllDirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot | QDir.Filter.Hidden)
         # Show only .zip files
         self.model.setNameFilters(["*.zip"])
         self.model.setNameFilterDisables(False)
@@ -147,9 +147,9 @@ class ArchiveTreeDialog(QDialog):
 
         # Show Name, Size, Date Modified; hide Type
         self.tree_view.setColumnHidden(2, True)
-        self.tree_view.header().setSectionResizeMode(0, QHeaderView.Interactive)
-        self.tree_view.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.tree_view.header().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tree_view.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.tree_view.header().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.tree_view.header().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.tree_view.setColumnWidth(0, 280)  # Name column: 50px wider (was ~300px)
 
         # Expand root drives for visibility

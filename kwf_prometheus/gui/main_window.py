@@ -14,11 +14,8 @@ from PySide6.QtWidgets import (
     QFrame, QMessageBox, QProgressBar, QStatusBar
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction
-import qtawesome as qta
-
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QAction
+from PySide6.QtGui import QAction, QPixmap
+import qtawesome as qta  # type: ignore[import-untyped]
 
 from .analysis_data_screen import AnalysisDataScreen
 from .home_screen import HomeScreen
@@ -481,9 +478,9 @@ class MainWindow(QMainWindow):
             f"<h2>KWF Prometheus</h2>"
             f"<p><b>Версия:</b> {settings.app_version}</p>"
             f"<p><b>Режим хранения:</b> {mode_text}</p>"
-            f"<p>Система анализа вибрационной диагностики ветротурбин</p>"
-            f"<p><b>Разработано:</b> A.Telezhenko, 2026</p>"
+            f"<p>Система анализа и вибрационной диагностики ВЭУ</p>"
             f"<p><b>Стандарты:</b> ISO 10816-21:2015, ГОСТ 10816-21-2021</p>"
+            f"<p><b></b> A.Telezhenko, 2026</p>"
         )
 
     def _on_connection_success(self, info: str):

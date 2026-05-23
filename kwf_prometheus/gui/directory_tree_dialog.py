@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QFileSystemModel, QFrame
 )
 from PySide6.QtCore import QDir, QSize
-import qtawesome as qta
+import qtawesome as qta  # type: ignore[import-untyped]
 from .styled_message_box import show_warning
 
 
@@ -59,7 +59,7 @@ class DirectoryTreeDialog(QDialog):
 
         # Separator
         sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
+        sep.setFrameShape(QFrame.Shape.VLine)
         sep.setStyleSheet("color: #333333;")
         sep.setFixedWidth(1)
         nav_layout.addWidget(sep)
@@ -96,13 +96,13 @@ class DirectoryTreeDialog(QDialog):
 
         # Tree view
         self.tree_view = QTreeView()
-        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.tree_view.setAlternatingRowColors(False)
         self.tree_view.setAnimated(True)
         self.tree_view.setIndentation(20)
         self.tree_view.setSortingEnabled(True)
         self.tree_view.setHeaderHidden(False)
-        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.tree_view.header().setStretchLastSection(True)
         self.tree_view.setIconSize(QSize(8, 8))
         layout.addWidget(self.tree_view)
@@ -138,7 +138,7 @@ class DirectoryTreeDialog(QDialog):
     def _setup_model(self, initial_path):
         self.model = QFileSystemModel()
         self.model.setRootPath("")
-        self.model.setFilter(QDir.AllDirs | QDir.NoDotAndDotDot | QDir.Hidden)
+        self.model.setFilter(QDir.Filter.AllDirs | QDir.Filter.NoDotAndDotDot | QDir.Filter.Hidden)
         self.tree_view.setModel(self.model)
 
         self.tree_view.setColumnHidden(1, True)
