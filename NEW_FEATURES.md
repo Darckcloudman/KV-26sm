@@ -1,4 +1,4 @@
-# Новые функции SMP12C VibroDiag Analyzer
+# Новые функции KWF Prometheus
 
 ## Обзор
 
@@ -199,7 +199,7 @@ test_data/zip/
 
 ### Инструкция
 
-1. Запустите `SMP12C_VibroDiag.exe`
+1. Запустите `KWF_Prometheus.exe`
 2. Нажмите **«Загрузить ZIP»**
 3. Выберите архив из `test_data/zip/`
 4. Проверьте экран **Информация**:
@@ -219,8 +219,8 @@ test_data/zip/
 ```powershell
 cd D:\Сoding\pyton_pro\app
 Remove-Item -Path "dist", "build" -Recurse -Force
-pyinstaller --onefile --windowed --name "SMP12C_VibroDiag" smp12c_vibrodiag/main.py
-Copy-Item "dist\SMP12C_VibroDiag.exe" -Destination "D:\Сoding\pyton_pro\" -Force
+pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
+Copy-Item "dist\KWF_Prometheus.exe" -Destination "D:\Сoding\pyton_pro\" -Force
 ```
 
 ---

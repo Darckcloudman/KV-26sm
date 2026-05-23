@@ -1,4 +1,4 @@
-# Руководство по разработке SMP12C VibroDiag Analyzer
+# Руководство по разработке KWF Prometheus
 
 ## ЗАПРЕЩЕНО: Emoji в коде
 

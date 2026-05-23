@@ -1,4 +1,4 @@
-# Справочник цветов интерфейса SMP12C VibroDiag Analyzer
+# Справочник цветов интерфейса KWF Prometheus
 
 **Версия:** v1.4 | **Последнее обновление:** 2025-05-20
 
@@ -43,7 +43,7 @@
 | Элемент | Свойство | Цвет | Строка |
 |---------|----------|------|--------|
 | HomeScreen (QPalette.Window) | background | `#000000` | 422 |
-| Заголовок "WTG Vibrodiag Analizer" | color | `#FFFFFF` | 432 |
+| Заголовок "KWF Prometheus" | color | `#FFFFFF` | 432 |
 | Кнопки (QPushButton) | background | `#FFFFFF` | 445 |
 | Кнопки (QPushButton) | color | `#000000` | 446 |
 | Кнопки (hover) | background | `#E8E8E8` | 454 |

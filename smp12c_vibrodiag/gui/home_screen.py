@@ -2,26 +2,13 @@
 """
 Вкладка Home (home_screen.py)
 ==============================
-Главный экран приложения SMP12C VibroDiag Analyzer.
+Главный экран приложения KWF Prometheus.
 
 Содержит:
-  • Таблицу архивов (.zip / .rd2) с кастомным скроллбаром
-  • Интерактивную схему турбины (shema.png) с 8 датчиками
-  • Плавно мигающие индикаторы статуса (QVariantAnimation)
-  • Список описаний датчиков с текстовым статусом
-
-Статусы индикаторов (SensorIndicator):
-  • empty   — датчик отсутствует в загруженном файле (прозрачный кружок,
-              чёрная рамка 5 px, чёрный номер, без мигания)
-  • ok      — все 3 типа сигналов загружены (зелёная рамка пульсирует
-              плавно, прозрачный центр, чёрный номер)
-  • partial — загружен 1–2 типа сигналов (жёлтая рамка пульсирует
-              плавно, прозрачный центр, чёрный номер)
-  • none    — датчик есть в файле, но данных нет (белая заливка,
-              красная рамка 5 px, белый номер, без мигания)
-
-Координаты SENSOR_POSITIONS зафиксированы вручную под shema.png.
-Изменять только при замене изображения.
+- Таблицу архивов с поиском
+- Схему расположения датчиков
+- Индикаторы статуса
+- Кнопки загрузки
 """
 
 import re
@@ -458,7 +445,7 @@ class HomeScreen(QWidget):
         main_layout.setSpacing(14)
 
         # Заголовок
-        title = QLabel("WTG Vibrodiag Analizer")
+        title = QLabel("KWF Prometheus")
         title.setStyleSheet("color: #FFFFFF; font-size: 22px; font-weight: bold; background: transparent;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title)
@@ -715,7 +702,7 @@ class HomeScreen(QWidget):
         main_layout.addWidget(self.analyze_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Версия и режим работы
-        version_label = QLabel("v1.3 | A.Telezhenko, 2026")
+        version_label = QLabel("v1.4.1 | A.Telezhenko, 2026")
         version_label.setStyleSheet("color: #444444; font-size: 9px; background: transparent;")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(version_label)

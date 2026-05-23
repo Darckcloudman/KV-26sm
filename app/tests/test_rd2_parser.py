@@ -1,4 +1,4 @@
-﻿"""Тесты для SMP12C VibroDiag v2.0.0"""
+﻿"""Тесты для KWF Prometheus v2.0.0"""
 import unittest
 import numpy as np
 import tempfile

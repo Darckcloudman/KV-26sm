@@ -26,11 +26,11 @@ from PyQt5.QtWidgets import QApplication
 
 
 class MainWindow(QMainWindow):
-    """Главное окно приложения SMP12C VibroDiag"""
+    """Главное окно приложения KWF Prometheus"""
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('SMP12C VibroDiag Analyzer')
+        self.setWindowTitle('KWF Prometheus')
         self.setGeometry(100, 100, 1400, 900)
         
         self._temp_dirs: List[Path] = []  # Временные директории для ZIP
@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         layout.setAlignment(Qt.AlignCenter)
         
         # Заголовок
-        title_label = QLabel('SMP12C VibroDiag Analyzer')
+        title_label = QLabel('KWF Prometheus')
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
             font-size: 28px;
@@ -618,7 +618,7 @@ class MainWindow(QMainWindow):
         show_about(
             self,
             'О программе',
-            'SMP12C VibroDiag Analyzer v1.0.0\n\n'
+            'KWF Prometheus v1.0.0\n\n'
             'Приложение для анализа вибрационной диагностики\n'
             'ветротурбин системы SMP12C (Siemens Gamesa)\n\n'
             'Технологии: Python, PyQt5, matplotlib, numpy'

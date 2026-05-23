@@ -1,10 +1,10 @@
-# План воссоздания приложения SMP12C VibroDiag в одном EXE файле
+# План воссоздания приложения KWF Prometheus в одном EXE файле
 
 ## 📋 Резюме проекта
 
 | Параметр | Значение |
 |----------|----------|
-| **Название** | SMP12C VibroDiag Analyzer |
+| **Название** | KWF Prometheus |
 | **Тип** | GUI-приложение для анализа вибрационной диагностики |
 | **Исходный формат** | Декремилированный PyInstaller EXE (70 MB) |
 | **Цель** | Воссоздание функционала в одном EXE файле |
@@ -271,7 +271,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='SMP12C_VibroDiag',
+    name='KWF_Prometheus',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -293,7 +293,7 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='SMP12C_VibroDiag',
+    name='KWF_Prometheus',
 )
 
 # Для одного EXE файла раскомментировать:
@@ -304,7 +304,7 @@ coll = COLLECT(
 #     a.zipfiles,
 #     a.datas,
 #     [],
-#     name='SMP12C_VibroDiag',
+#     name='KWF_Prometheus',
 #     debug=False,
 #     bootloader_ignore_signals=False,
 #     strip=False,
@@ -317,7 +317,7 @@ coll = COLLECT(
 ```powershell
 pyinstaller --clean build.spec
 # Или напрямую:
-pyinstaller --onefile --windowed --name "SMP12C_VibroDiag" --icon=icon.ico smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" --icon=icon.ico smp12c_vibrodiag/main.py
 ```
 
 ---
@@ -405,9 +405,9 @@ pip install -r requirements.txt
 python -m smp12c_vibrodiag.main
 
 # 5. Собрать EXE
-pyinstaller --onefile --windowed --name "SMP12C_VibroDiag" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
 
-# 6. Найти EXE в dist/SMP12C_VibroDiag.exe
+# 6. Найти EXE в dist/KWF_Prometheus.exe
 ```
 
 ---

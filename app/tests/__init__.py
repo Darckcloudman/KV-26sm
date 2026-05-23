@@ -1,4 +1,4 @@
 # -*- coding: utf-8 -*-
 """
-Тесты для SMP12C VibroDiag Analyzer v1.3
+Тесты для KWF Prometheus v1.4.1
 """

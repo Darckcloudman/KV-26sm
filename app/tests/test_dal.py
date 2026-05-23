@@ -120,7 +120,7 @@ class TestSettings:
         """Тест настроек по умолчанию."""
         from smp12c_vibrodiag.dal.config import settings
         
-        assert settings.app_version == "1.3"
+        assert settings.app_version == "1.4.1"
         assert settings.use_database is False
         assert settings.db_host == "localhost"
         assert settings.db_port == 5432

@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "smp12c-vibrodiag"
-version = "1.4.0"
-description = "SMP12C VibroDiag Analyzer — вибродиагностика ветротурбин"
+name = "kwf-prometheus"
+version = "1.4.1"
+description = "KWF Prometheus — вибродиагностика ветротурбин"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.24",

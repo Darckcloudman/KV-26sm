@@ -1,7 +1,7 @@
-# SMP12C VibroDiag Analyzer - EXE Build Script
+# KWF Prometheus - EXE Build Script
 # Best practice: run via powershell.exe -ExecutionPolicy Bypass -File .\build_exe.ps1
 
-Write-Host "=== SMP12C VibroDiag Analyzer - Building EXE" -ForegroundColor Cyan
+Write-Host "=== KWF Prometheus - Building EXE" -ForegroundColor Cyan
 Write-Host ""
 
 # Check virtual environment
@@ -51,7 +51,7 @@ Write-Host ""
 # Single EXE file
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
-python -m PyInstaller --onefile --windowed --name "SMP12C_VibroDiag" `
+python -m PyInstaller --onefile --windowed --name "KWF_Prometheus" `
     --add-data "test_data;test_data" `
     smp12c_vibrodiag/main.py
 
@@ -59,9 +59,9 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "=== Build completed successfully! ===" -ForegroundColor Green
     Write-Host ""
-    Write-Host "EXE file: dist\SMP12C_VibroDiag.exe" -ForegroundColor Cyan
+    Write-Host "EXE file: dist\KWF_Prometheus.exe" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "To run: dist\SMP12C_VibroDiag.exe" -ForegroundColor Yellow
+    Write-Host "To run: dist\KWF_Prometheus.exe" -ForegroundColor Yellow
 } else {
     Write-Host ""
     Write-Host "Build error!" -ForegroundColor Red

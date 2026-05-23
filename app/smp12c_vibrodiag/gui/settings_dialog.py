@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Диалог настроек приложения SMP12C VibroDiag Analyzer v1.4
+Диалог настроек приложения KWF Prometheus v1.4
 """
 
 from PySide6.QtWidgets import (

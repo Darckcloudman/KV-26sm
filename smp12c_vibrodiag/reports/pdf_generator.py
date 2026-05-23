@@ -155,7 +155,7 @@ class PDFReportGenerator:
 
             # === Подвал ===
             story.append(Paragraph(
-                f"SMP12C VibroDiag Analyzer v1.3 | Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')} | A.Telezhenko, 2026",
+                f"KWF Prometheus v1.4.1 | Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')} | A.Telezhenko, 2026",
                 info_style
             ))
 

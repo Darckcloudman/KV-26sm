@@ -1,4 +1,4 @@
-# SMP12C VibroDiag Analyzer v1.3 - Руководство по DAL
+# KWF Prometheus v1.3 - Руководство по DAL
 
 ## Обзор изменений
 

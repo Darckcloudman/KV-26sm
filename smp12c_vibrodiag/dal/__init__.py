@@ -1,9 +1,7 @@
 """
-DAL (Data Access Layer) для SMP12C VibroDiag Analyzer v1.3
+DAL (Data Access Layer) для KWF Prometheus v1.4.1
 
 Слой доступа к данным с поддержкой:
-- Файловая система (.zip/.rd2)
-- PostgreSQL для хранения распарсенных данных
 """
 
 from .config import settings

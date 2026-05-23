@@ -1,4 +1,4 @@
-# Настройка SMP12C VibroDiag Analyzer v1.3
+# Настройка KWF Prometheus v1.3
 
 ## Быстрый старт
 

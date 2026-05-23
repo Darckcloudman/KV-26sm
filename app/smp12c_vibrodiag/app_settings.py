@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Настройки приложения SMP12C VibroDiag Analyzer.
+Настройки приложения KWF Prometheus.
 
 Сохраняются в JSON-файл app_settings.json рядом с приложением.
 """

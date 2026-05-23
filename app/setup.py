@@ -1,4 +1,4 @@
-﻿"""Setup для сборки SMP12C VibroDiag Analyzer v1.3 через cx_Freeze"""
+﻿"""Setup для сборки KWF Prometheus v1.4.1 через cx_Freeze"""
 
 from cx_Freeze import setup, Executable
 import sys
@@ -41,13 +41,13 @@ executables = [
     Executable(
         "smp12c_vibrodiag/main.py",
         base=base,
-        target_name="SMP12C_VibroDiag.exe",
+        target_name="KWF_Prometheus.exe",
         icon=None
     )
 ]
 
 setup(
-    name="SMP12C_VibroDiag",
+    name="KWF_Prometheus",
     version="1.3.0",
     description="Анализатор вибрационной диагностики ветротурбин SMP12C",
     author="NLP-Core-Team",

@@ -2,7 +2,7 @@
 """
 Вкладка Home (home_screen.py)
 ==============================
-Главный экран приложения SMP12C VibroDiag Analyzer.
+Главный экран приложения KWF Prometheus.
 
 Содержит:
   • Таблицу архивов (.zip / .rd2) с кастомным скроллбаром
@@ -463,7 +463,7 @@ class HomeScreen(QWidget):
         main_layout.setSpacing(14)
 
         # Заголовок
-        title = QLabel("WTG Vibrodiag Analizer")
+        title = QLabel("KWF Prometheus")
         title.setStyleSheet("color: #FFFFFF; font-size: 22px; font-weight: bold; background: transparent;")
         title.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title)
@@ -752,7 +752,7 @@ class HomeScreen(QWidget):
         main_layout.addWidget(self.analyze_btn, alignment=Qt.AlignCenter)
 
         # Версия и режим работы
-        version_label = QLabel("v1.3 | A.Telezhenko, 2026")
+        version_label = QLabel("v1.4.1 | A.Telezhenko, 2026")
         version_label.setStyleSheet("color: #444444; font-size: 9px; background: transparent;")
         version_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(version_label)

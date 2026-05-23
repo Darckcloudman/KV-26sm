@@ -1,7 +1,7 @@
-# SMP12C VibroDiag - Integration Tests Runner
+# KWF Prometheus - Integration Tests Runner
 # Best practice: run via powershell.exe -ExecutionPolicy Bypass -File .\run_integration_tests.ps1
 
-Write-Host "=== SMP12C VibroDiag - Integration Tests ===" -ForegroundColor Cyan
+Write-Host "=== KWF Prometheus - Integration Tests ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Check Docker

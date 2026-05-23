@@ -1,6 +1,6 @@
-﻿# SMP12C VibroDiag Analyzer v1.3
+﻿# KWF Prometheus v1.4.1
 
-GUI-приложение для анализа вибрационной диагностики ветротурбин системы SMP12C (Siemens Gamesa Renewable Energy).
+GUI-приложение для анализа вибрационной диагностики ветротурбин.
 
 ## Что нового в v1.3
 
@@ -89,7 +89,7 @@ python -m smp12c_vibrodiag.main
 python setup.py build_exe
 ```
 
-Результат: `build/exe.win-amd64-3.14/SMP12C_VibroDiag.exe`
+Результат: `build/exe.win-amd64-3.14/KWF_Prometheus.exe`
 
 ## Возможности
 

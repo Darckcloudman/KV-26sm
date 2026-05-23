@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Конфигурация приложения SMP12C VibroDiag Analyzer v1.3
+Конфигурация приложения KWF Prometheus v1.4.1
 
 Читает настройки из файла .env в корне проекта.
 """
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     """Настройки приложения из .env файла."""
     
     # Версия приложения
-    app_version: str = "1.3"
+    app_version: str = "1.4.1"
     
     # Использование базы данных (true/false)
     use_database: bool = False

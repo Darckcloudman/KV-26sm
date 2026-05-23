@@ -1,4 +1,4 @@
-# Быстрый старт — SMP12C VibroDiag Analyzer
+# Быстрый старт — KWF Prometheus
 
 ## 🎯 Что сделано
 
@@ -75,10 +75,10 @@ python -m smp12c_vibrodiag.main
 powershell.exe -ExecutionPolicy Bypass -File .\build_exe.ps1
 
 # Или вручную
-pyinstaller --onefile --windowed --name "SMP12C_VibroDiag" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
 ```
 
-Результат: `dist\SMP12C_VibroDiag.exe`
+Результат: `dist\KWF_Prometheus.exe`
 
 ---
 
@@ -181,10 +181,10 @@ smp12c_vibrodiag/
 
 ```powershell
 # Один EXE файл (рекомендуется)
-pyinstaller --onefile --windowed --name "SMP12C_VibroDiag" smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" smp12c_vibrodiag/main.py
 
 # С иконкой (если есть icon.ico)
-pyinstaller --onefile --windowed --name "SMP12C_VibroDiag" --icon=icon.ico smp12c_vibrodiag/main.py
+pyinstaller --onefile --windowed --name "KWF_Prometheus" --icon=icon.ico smp12c_vibrodiag/main.py
 
 # Использовать build.spec
 pyinstaller --clean build.spec
@@ -255,7 +255,7 @@ pyinstaller --clean build.spec
 1. `.\install_and_run.ps1` — установить и запустить
 2. Протестировать на `test_data/`
 3. `.\build_exe.ps1` — собрать EXE
-4. Использовать `dist\SMP12C_VibroDiag.exe`
+4. Использовать `dist\KWF_Prometheus.exe`
 
 ---
 

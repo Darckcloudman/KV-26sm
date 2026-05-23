@@ -1,4 +1,4 @@
-# Тесты для SMP12C VibroDiag Analyzer
+# Тесты для KWF Prometheus
 
 ## Запуск тестов
 

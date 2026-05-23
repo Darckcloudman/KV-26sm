@@ -1,7 +1,7 @@
-# SMP12C VibroDiag Analyzer - Installation and Launch Script
+# KWF Prometheus - Installation and Launch Script
 # Best practice: run via powershell.exe -ExecutionPolicy Bypass -File .\install_and_run.ps1
 
-Write-Host "=== SMP12C VibroDiag Analyzer - Installation & Launch" -ForegroundColor Cyan
+Write-Host "=== KWF Prometheus - Installation & Launch" -ForegroundColor Cyan
 Write-Host ""
 
 # Check Python

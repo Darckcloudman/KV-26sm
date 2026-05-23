@@ -1,5 +1,5 @@
 """
-Главное окно приложения SMP12C VibroDiag Analyzer v1.3
+Главное окно приложения KWF Prometheus v1.4.1
 
 Тёмная тема, PySide6, анализ данных ВЭУ.
 С поддержкой DAL (Data Access Layer) и PostgreSQL.
@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"SMP12C VibroDiag Analyzer v{settings.app_version}")
+        self.setWindowTitle(f"KWF Prometheus v{settings.app_version}")
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
 
@@ -464,7 +464,7 @@ class MainWindow(QMainWindow):
         show_about(
             self,
             "О программе",
-            f"<h2>SMP12C VibroDiag Analyzer</h2>"
+            f"<h2>KWF Prometheus</h2>"
             f"<p><b>Версия:</b> {settings.app_version}</p>"
             f"<p><b>Режим хранения:</b> {mode_text}</p>"
             f"<p>Система анализа вибрационной диагностики ветротурбин</p>"

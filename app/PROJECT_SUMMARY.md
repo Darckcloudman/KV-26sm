@@ -1,4 +1,4 @@
-# SMP12C VibroDiag Analyzer
+# KWF Prometheus
 
 ## Текущая версия: 1.3
 
@@ -92,7 +92,7 @@ app/
 ```powershell
 python setup.py build_exe
 ```
-Результат: `build/exe.win-amd64-3.14/SMP12C_VibroDiag.exe`
+Результат: `build/exe.win-amd64-3.14/KWF_Prometheus.exe`
 
 ## Зависимости
 - numpy, scipy, PySide6, pyqtgraph, cx_Freeze, pyyaml

@@ -1,4 +1,4 @@
-"""Точка входа в приложение SMP12C VibroDiag Analyzer v1.3
+"""Точка входа в приложение KWF Prometheus v1.4.1
 
 С поддержкой DAL (Data Access Layer) и PostgreSQL.
 """
@@ -23,9 +23,9 @@ def main():
     # Создание приложения
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # Принудительно используем Fusion стиль для консистентности
-    app.setApplicationName('SMP12C VibroDiag Analyzer')
-    app.setApplicationVersion('1.3')
-    app.setOrganizationName('SMP12C')
+    app.setApplicationName('KWF Prometheus')
+    app.setApplicationVersion('1.4.1')
+    app.setOrganizationName('KWF')
     
     # Применение стилей (закомментировано для отладки)
     # from smp12c_vibrodiag.gui.styles import STYLESHEET

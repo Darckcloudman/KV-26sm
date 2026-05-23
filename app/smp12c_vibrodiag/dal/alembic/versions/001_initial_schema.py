@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Initial schema migration for SMP12C VibroDiag Analyzer v1.3
+Initial schema migration for KWF Prometheus v1.4.1
 
 Creates tables:
 - turbines
