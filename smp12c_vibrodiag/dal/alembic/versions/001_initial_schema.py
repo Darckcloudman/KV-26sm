@@ -5,9 +5,9 @@ Initial schema migration for KWF Prometheus v1.4.1
 Creates tables:
 """
 
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from alembic import op  # type: ignore[import]
+import sqlalchemy as sa  # type: ignore[import]
+from sqlalchemy.dialects import postgresql  # type: ignore[import]
 
 # revision identifiers
 revision = '001'
