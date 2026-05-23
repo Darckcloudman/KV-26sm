@@ -89,6 +89,51 @@ class LoadingSpinner(QWidget):
         
         painter.resetTransform()
 
+class PulseRedDot(QWidget):
+    """Пульсирующая красная точка — индикатор точки подключения.
+
+    Кружок растёт из центра (диаметр 2→8 px) и плавно исчезает.
+    Анимация бесконечная, запускается автоматически при создании.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(30, 30)
+        self._progress = 0.0
+
+        self._animation = QPropertyAnimation(self, b"progress")
+        self._animation.setDuration(1000)
+        self._animation.setStartValue(0.0)
+        self._animation.setEndValue(1.0)
+        self._animation.setLoopCount(-1)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self._animation.start()
+
+    def get_progress(self) -> float:
+        return self._progress
+
+    def set_progress(self, value: float):
+        self._progress = value
+        self.update()
+
+    progress = property(get_progress, set_progress)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        min_radius = 1.0   # диаметр 2 px
+        max_radius = 4.0   # диаметр 8 px
+        current_radius = min_radius + (max_radius - min_radius) * self._progress
+        opacity = 1.0 - self._progress
+
+        center = QPointF(self.width() / 2, self.height() / 2)
+        painter.setOpacity(opacity)
+        painter.setBrush(QBrush(QColor(255, 59, 59)))   # ярко-красный
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(center, current_radius, current_radius)
+
+
 from ..parsers.rd2_parser import MultiSensorRD2Parser, RD2Parser
 from ..dal.repositories.base import IVibrationRepository
 from ..dal.logger import get_logger
@@ -124,6 +169,22 @@ SENSOR_POSITIONS = [
     (0.182, 0.32),    # 6 - верхний левый
     (0.047, 0.304),   # 7 - верхний центр
     (0.881, 0.378),   # 8 - верхний правый (отдельный круг)
+]
+
+# Координаты точек подключения на shema.png — относительные (0.0–1.0).
+# Чтобы подстроить положение: открой shema.png в любом редакторе,
+# определи x и y в пикселях от левого верхнего угла, раздели на
+# ширину/высоту изображения. Пример: для shema.png 2564×1612 px
+# точка в (500, 400) → (500/2564, 400/1612) ≈ (0.195, 0.248)
+CONNECTION_POSITIONS = [
+    (0.120, 0.720),   # 1 — точка подключения датчика 1
+    (0.490, 0.940),   # 2
+    (0.520, 0.670),   # 3
+    (0.910, 0.890),   # 4
+    (0.850, 0.640),   # 5
+    (0.200, 0.340),   # 6
+    (0.065, 0.324),   # 7
+    (0.898, 0.398),   # 8
 ]
 
 
@@ -331,6 +392,7 @@ class SensorScheme(QFrame):
         self._pixmap = None
         self._scaled_pixmap = None
         self._indicators = []
+        self._connection_dots = []
         self._pixmap_x = 0
         self._pixmap_y = 0
         self._scale = 1.0
@@ -346,12 +408,18 @@ class SensorScheme(QFrame):
                 self._pixmap = QPixmap(str(p))
                 break
 
-        # Создаём индикаторы
+        # Создаём индикаторы датчиков
         for i in range(8):
             indicator = SensorIndicator(i + 1, self)
             indicator.clicked.connect(self.sensor_clicked.emit)
             self._indicators.append(indicator)
             indicator.show()
+
+        # Создаём точки подключения (пульсирующие красные кружки)
+        for _ in range(8):
+            dot = PulseRedDot(self)
+            self._connection_dots.append(dot)
+            dot.show()
 
     def set_sensor_status(self, sensor_id, status):
         if 1 <= sensor_id <= 8:
@@ -384,6 +452,13 @@ class SensorScheme(QFrame):
             x = self._pixmap_x + int(rel_x * self._pixmap.width() * self._scale) - 13
             y = self._pixmap_y + int(rel_y * self._pixmap.height() * self._scale) - 13
             ind.move(x, y)
+
+        # Позиционируем точки подключения (центр точки = координата)
+        for i, (rel_x, rel_y) in enumerate(CONNECTION_POSITIONS):
+            dot = self._connection_dots[i]
+            x = self._pixmap_x + int(rel_x * self._pixmap.width() * self._scale) - 15
+            y = self._pixmap_y + int(rel_y * self._pixmap.height() * self._scale) - 15
+            dot.move(x, y)
 
     def paintEvent(self, event):
         painter = QPainter(self)
