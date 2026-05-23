@@ -463,12 +463,15 @@ class HomeScreen(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title)
 
-        # Кнопки + путь
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(16)
+        # Основной контент: левая колонка (кнопки + таблица) | правая колонка (схема + статусы)
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(16)
 
-        left_top = QVBoxLayout()
-        left_top.setSpacing(8)
+        # --- Левая колонка ---
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
 
         btn_style = """
             QPushButton {
@@ -488,35 +491,25 @@ class HomeScreen(QWidget):
         self.load_rd2_btn = QPushButton("Загрузить файл .rd2")
         self.load_rd2_btn.setStyleSheet(btn_style)
         self.load_rd2_btn.clicked.connect(self._load_rd2_file)
-        left_top.addWidget(self.load_rd2_btn)
+        left_layout.addWidget(self.load_rd2_btn)
 
         self.load_btn = QPushButton("Загрузить архив .zip")
         self.load_btn.setStyleSheet(btn_style)
         self.load_btn.clicked.connect(self._load_archive)
-        left_top.addWidget(self.load_btn)
+        left_layout.addWidget(self.load_btn)
 
         self.dir_btn = QPushButton("Выбрать место хранения архивов")
         self.dir_btn.setStyleSheet(btn_style)
         self.dir_btn.clicked.connect(self._select_directory)
-        left_top.addWidget(self.dir_btn)
+        left_layout.addWidget(self.dir_btn)
 
         # --- Автопарсинг (v1.4) ---
         self.auto_scan_checkbox = QCheckBox("Автоматически импортировать новые архивы")
         self.auto_scan_checkbox.setStyleSheet(CHECKBOX_STYLE)
         self.auto_scan_checkbox.setChecked(self.auto_scan_service is not None and self.auto_scan_service.enabled)
         self.auto_scan_checkbox.stateChanged.connect(self._on_auto_scan_toggled)
-        left_top.addWidget(self.auto_scan_checkbox)
+        left_layout.addWidget(self.auto_scan_checkbox)
         # --- Конец автопарсинга ---
-        
-        left_top.addStretch()
-
-        top_layout.addLayout(left_top, 0)
-        top_layout.addStretch(1)
-        main_layout.addLayout(top_layout)
-
-        # Таблица + Схема
-        middle_layout = QHBoxLayout()
-        middle_layout.setSpacing(4)
 
         # Таблица
         table_frame = QFrame()
@@ -643,23 +636,24 @@ class HomeScreen(QWidget):
         self.archive_table.itemSelectionChanged.connect(self._on_archive_selected)
         table_layout.addWidget(self.archive_table)
 
-        middle_layout.addWidget(table_frame, 0)
+        left_layout.addWidget(table_frame, 1)
+        content_layout.addWidget(left_panel, 0)
 
-        # Правая панель: схема сверху + статусы снизу
+        # --- Правая колонка: схема + статусы ---
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(8)
 
-        # Схема — прижата влево (ближе к таблице), по верху
+        # Схема
         scheme_wrapper = QHBoxLayout()
         self.scheme = SensorScheme()
         self.scheme.sensor_clicked.connect(self._on_sensor_clicked)
         scheme_wrapper.addWidget(self.scheme, alignment=Qt.AlignmentFlag.AlignTop)
         scheme_wrapper.addStretch()
-        right_layout.addLayout(scheme_wrapper, 2)
+        right_layout.addLayout(scheme_wrapper, 0)
 
-        # Список статусов — прижаты влево (ближе к таблице) и к верху
+        # Список статусов
         status_wrapper = QHBoxLayout()
         status_frame = QFrame()
         status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
@@ -667,8 +661,8 @@ class HomeScreen(QWidget):
         status_layout.setContentsMargins(0, 0, 0, 0)
         status_layout.setHorizontalSpacing(8)
         status_layout.setVerticalSpacing(4)
-        status_layout.setColumnStretch(1, 1)   # Описание растягивается
-        status_layout.setColumnStretch(2, 0)   # Статус — фиксированная ширина
+        status_layout.setColumnStretch(1, 1)
+        status_layout.setColumnStretch(2, 0)
 
         self.status_labels = {}
         for i, desc in enumerate(SENSOR_DESCRIPTIONS):
@@ -693,14 +687,13 @@ class HomeScreen(QWidget):
         status_wrapper.addWidget(status_frame)
         status_wrapper.addStretch()
         
-        # Контейнер для выравнивания статусов по верху
         status_container = QWidget()
         status_container.setLayout(status_wrapper)
         right_layout.addWidget(status_container, 0, Qt.AlignmentFlag.AlignTop)
-        right_layout.addStretch()  # всё лишнее пространство снизу
+        # Убрали addStretch() — панель минимальной высоты
 
-        middle_layout.addWidget(right_panel, 1)
-        main_layout.addLayout(middle_layout, 2)
+        content_layout.addWidget(right_panel, 1, Qt.AlignmentFlag.AlignTop)
+        main_layout.addLayout(content_layout, 2)
 
         # Кнопка анализа
         self.analyze_btn = QPushButton("Проанализировать")
