@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QFrame, QSizePolicy, QProgressBar, QAbstractItemView, QTreeView,
     QDialog, QLineEdit, QCheckBox
 )
-from PySide6.QtCore import Qt, QThread, Signal, QRect, QPointF, Property, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
+from PySide6.QtCore import Qt, QThread, Signal, QRect, QPointF, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer
 from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette, QConicalGradient
 
 
@@ -102,21 +102,17 @@ class PulseRedDot(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._progress = 0.0
 
-        self._animation = QPropertyAnimation(self, b"progress")
+        self._animation = QVariantAnimation(self)
         self._animation.setDuration(1000)
         self._animation.setStartValue(0.0)
         self._animation.setEndValue(1.0)
         self._animation.setLoopCount(-1)
         self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self._animation.valueChanged.connect(self._on_value_changed)
         self._animation.start()
 
-    @Property(float)
-    def progress(self):
-        return self._progress
-
-    @progress.setter
-    def progress(self, value: float):
-        self._progress = value
+    def _on_value_changed(self, value):
+        self._progress = float(value)
         self.update()
 
     def paintEvent(self, event):
@@ -179,7 +175,7 @@ SENSOR_POSITIONS = [
 # точка в (500, 400) → (500/2564, 400/1612) ≈ (0.195, 0.248)
 CONNECTION_POSITIONS = [
     (0.382, 0.850),   # 1 — точка подключения датчика 1
-    (0.290, 0.340),   # 2
+    (0.606, 0.394),   # 2
     (0.520, 0.670),   # 3
     (0.910, 0.890),   # 4
     (0.850, 0.640),   # 5
