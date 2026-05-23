@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QFrame, QSizePolicy, QProgressBar, QAbstractItemView, QTreeView,
     QDialog, QLineEdit, QCheckBox
 )
-from PySide6.QtCore import Qt, QThread, Signal, QRect, QPointF, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
+from PySide6.QtCore import Qt, QThread, Signal, QRect, QPointF, Property, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
 from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette, QConicalGradient
 
 
@@ -110,14 +110,14 @@ class PulseRedDot(QWidget):
         self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self._animation.start()
 
-    def get_progress(self) -> float:
+    @Property(float)
+    def progress(self):
         return self._progress
 
-    def set_progress(self, value: float):
+    @progress.setter
+    def progress(self, value: float):
         self._progress = value
         self.update()
-
-    progress = property(get_progress, set_progress)
 
     def paintEvent(self, event):
         painter = QPainter(self)
