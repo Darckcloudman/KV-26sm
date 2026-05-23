@@ -92,21 +92,22 @@ class LoadingSpinner(QWidget):
 class PulseRedDot(QWidget):
     """Пульсирующая красная точка — индикатор точки подключения.
 
-    Кружок растёт из центра (диаметр 2→8 px) и плавно исчезает.
+    Крупный кружок (диаметр 12→28 px) с белой обводкой и свечением.
     Анимация бесконечная, запускается автоматически при создании.
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(30, 30)
+        self.setFixedSize(40, 40)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._progress = 0.0
 
         self._animation = QPropertyAnimation(self, b"progress")
-        self._animation.setDuration(1000)
+        self._animation.setDuration(1200)
         self._animation.setStartValue(0.0)
         self._animation.setEndValue(1.0)
         self._animation.setLoopCount(-1)
-        self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutSine)
         self._animation.start()
 
     def get_progress(self) -> float:
@@ -122,16 +123,28 @@ class PulseRedDot(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        min_radius = 1.0   # диаметр 2 px
-        max_radius = 4.0   # диаметр 8 px
-        current_radius = min_radius + (max_radius - min_radius) * self._progress
-        opacity = 1.0 - self._progress
+        t = self._progress
+        # Ядро: радиус 6→14 (диаметр 12→28 px)
+        core_radius = 6.0 + 8.0 * t
+        # Свечение: радиус 14→24
+        glow_radius = 14.0 + 10.0 * t
+        # Ядро почти не прозрачное, свечение исчезает
+        core_opacity = 1.0 - 0.15 * t
+        glow_opacity = 0.55 * (1.0 - t)
 
         center = QPointF(self.width() / 2, self.height() / 2)
-        painter.setOpacity(opacity)
-        painter.setBrush(QBrush(QColor(255, 59, 59)))   # ярко-красный
+
+        # Внешнее свечение (полупрозрачное, мягкое)
+        painter.setOpacity(glow_opacity)
+        painter.setBrush(QBrush(QColor(255, 60, 60, 140)))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(center, current_radius, current_radius)
+        painter.drawEllipse(center, glow_radius, glow_radius)
+
+        # Ядро — ярко-красное с белой обводкой для контраста
+        painter.setOpacity(core_opacity)
+        painter.setBrush(QBrush(QColor(255, 30, 30)))
+        painter.setPen(QPen(QColor(255, 255, 255), 2))
+        painter.drawEllipse(center, core_radius, core_radius)
 
 
 from ..parsers.rd2_parser import MultiSensorRD2Parser, RD2Parser
@@ -177,8 +190,8 @@ SENSOR_POSITIONS = [
 # ширину/высоту изображения. Пример: для shema.png 2564×1612 px
 # точка в (500, 400) → (500/2564, 400/1612) ≈ (0.195, 0.248)
 CONNECTION_POSITIONS = [
-    (0.120, 0.720),   # 1 — точка подключения датчика 1
-    (0.490, 0.940),   # 2
+    (0.382, 0.850),   # 1 — точка подключения датчика 1
+    (0.290, 0.340),   # 2
     (0.520, 0.670),   # 3
     (0.910, 0.890),   # 4
     (0.850, 0.640),   # 5
@@ -456,9 +469,10 @@ class SensorScheme(QFrame):
         # Позиционируем точки подключения (центр точки = координата)
         for i, (rel_x, rel_y) in enumerate(CONNECTION_POSITIONS):
             dot = self._connection_dots[i]
-            x = self._pixmap_x + int(rel_x * self._pixmap.width() * self._scale) - 15
-            y = self._pixmap_y + int(rel_y * self._pixmap.height() * self._scale) - 15
+            x = self._pixmap_x + int(rel_x * self._pixmap.width() * self._scale) - 20
+            y = self._pixmap_y + int(rel_y * self._pixmap.height() * self._scale) - 20
             dot.move(x, y)
+            dot.raise_()  # гарантируем, что точки поверх схемы и индикаторов
 
     def paintEvent(self, event):
         painter = QPainter(self)
