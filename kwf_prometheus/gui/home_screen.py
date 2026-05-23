@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QFrame, QSizePolicy, QProgressBar, QAbstractItemView, QTreeView,
     QDialog, QLineEdit, QCheckBox
 )
-from PySide6.QtCore import Qt, QThread, Signal, QRect, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
+from PySide6.QtCore import Qt, QThread, Signal, QRect, QPointF, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
 from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette, QConicalGradient
 
 
