@@ -324,12 +324,25 @@ class SpectrumChart(QWidget):
         if peak_numbers is None or len(peak_numbers) == 0:
             peak_numbers = list(range(1, len(peak_frequencies) + 1))
 
+        # Проверяем, что есть данные
+        if len(freq_data) == 0:
+            return
+
+        # Получаем максимальную частоту в данных (важно для ВЧ спектра!)
+        max_data_freq = np.max(freq_data)
+        min_data_freq = np.min(freq_data)
+
+        # DEBUG вывод
+        print(f"[DEBUG] SpectrumChart: range={self.freq_range}, data_freq_range=({min_data_freq:.1f}-{max_data_freq:.1f} Hz), peaks={len(peak_frequencies)}")
+
         # Ищем и отображаем пики, которые есть в текущих данных графика
         for i, peak_freq in enumerate(peak_frequencies[:10]):
-            # Ищем ближайшее значение частоты в данных графика
-            if len(freq_data) == 0:
-                continue
+            # ПРОВЕРКА: Пик не должен быть дальше максимальной частоты данных
+            if peak_freq > max_data_freq * 1.1:  # 10% запас
+                print(f"[DEBUG] Skipping peak {peak_numbers[i] if i < len(peak_numbers) else i+1} at {peak_freq:.1f} Hz (max data freq: {max_data_freq:.1f} Hz)")
+                continue  # Пик вне диапазона данных, пропускаем
 
+            # Ищем ближайшее значение частоты в данных графика
             closest_idx = np.argmin(np.abs(freq_data - peak_freq))
             closest_freq = freq_data[closest_idx]
             peak_amp = amplitude_data[closest_idx]
