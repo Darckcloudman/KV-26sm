@@ -430,7 +430,18 @@ class AnalysisDataScreen(QWidget):
         if len(amps) == 0:
             return []
 
-        # Используем scipy.signal.find_peaks для поиска локальных максимумов
+        # Для малых массивов (< 50 точек) используем простую сортировку по амплитуде
+        if len(amps) < 50:
+            peak_data = []
+            for i in range(len(freqs)):
+                peak_data.append({
+                    'frequency': freqs[i],
+                    'amplitude': amps[i]
+                })
+            peak_data.sort(key=lambda x: x['amplitude'], reverse=True)
+            return peak_data[:top_n]
+
+        # Для больших массивов используем scipy.signal.find_peaks
         from scipy.signal import find_peaks
         peaks, properties = find_peaks(amps, distance=max(1, len(amps) // 50), prominence=np.max(amps) * 0.05)
 
