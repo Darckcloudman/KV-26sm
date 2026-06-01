@@ -305,6 +305,7 @@ class SpectrumChart(QWidget):
         self._clear_peak_markers()
 
         if not peak_frequencies:
+            print(f"[DEBUG] SpectrumChart '{self.title}': Нет пиков для отображения")
             return
 
         # Если номера пиков не переданы, используем порядковые номера
@@ -313,15 +314,20 @@ class SpectrumChart(QWidget):
 
         # Проверяем, что есть данные
         if len(freq_data) == 0:
+            print(f"[DEBUG] SpectrumChart '{self.title}': Нет данных частоты")
             return
 
         # Получаем максимальную частоту в данных (важно для ВЧ спектра!)
         max_data_freq = np.max(freq_data)
+        min_data_freq = np.min(freq_data)
+
+        print(f"[DEBUG] SpectrumChart '{self.title}': data_range=({min_data_freq:.2f}-{max_data_freq:.2f}), peaks_to_show={len(peak_frequencies)}, freqs={peak_frequencies}")
 
         # Ищем и отображаем пики
         for i, peak_freq in enumerate(peak_frequencies[:10]):
             # ПРОВЕРКА 1: Пик не должен быть дальше максимальной частоты данных
             if peak_freq > max_data_freq * 1.1:  # 10% запас
+                print(f"[DEBUG] Пропуск пика {peak_numbers[i] if i < len(peak_numbers) else i+1} на {peak_freq:.2f} Гц (max_data={max_data_freq:.2f})")
                 continue  # Пик вне диапазона данных, пропускаем
 
             # Ищем ближайшее значение частоты в данных графика
@@ -331,6 +337,8 @@ class SpectrumChart(QWidget):
 
             # Получаем номер пика из таблицы
             peak_number = peak_numbers[i] if i < len(peak_numbers) else (i + 1)
+
+            print(f"[DEBUG] Добавлен пик #{peak_number} на {peak_freq:.2f} Гц, amp={peak_amp:.6f}")
 
             # Создаём маркер
             marker = BlinkingPeakMarker(

@@ -561,12 +561,14 @@ class AnalysisDataScreen(QWidget):
             if len(acc) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(acc, fs)
                 mask = (freqs >= 0.1) & (freqs <= 10)
+                freq_masked = freqs[mask]
+                amps_masked = amps[mask]
                 # Получаем ТОЛЬКО НЧ пики
                 nch_peaks = self._current_peaks.get('НЧ', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in nch_peaks]
                 peak_nums = [p['global_number'] for p in nch_peaks]
-                print(f"[DEBUG] НЧ пики: {len(nch_peaks)}, freqs={peak_freqs}")
-                self.spec_acc_chart.set_data(freqs[mask], amps[mask], 
+                print(f"[DEBUG] НЧ: data_len={len(freq_masked)}, freq_range=({np.min(freq_masked):.2f}-{np.max(freq_masked):.2f}), peaks={len(nch_peaks)}, freqs={peak_freqs}")
+                self.spec_acc_chart.set_data(freq_masked, amps_masked, 
                                             peak_frequencies=peak_freqs,
                                             peak_numbers=peak_nums)
             else:
@@ -581,13 +583,15 @@ class AnalysisDataScreen(QWidget):
             if len(vel) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(vel, fs)
                 mask = (freqs >= 10) & (freqs <= 1000)
+                freq_masked = freqs[mask]
+                amps_masked = amps[mask]
                 # Получаем ТОЛЬКО ВЧ пики
                 vch_peaks = self._current_peaks.get('ВЧ', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in vch_peaks]
                 peak_nums = [p['global_number'] for p in vch_peaks]
-                max_freq = np.max(freqs[mask]) if len(freqs[mask]) > 0 else 0
-                print(f"[DEBUG] ВЧ пики: {len(vch_peaks)}, freqs={peak_freqs}, max_data_freq={max_freq:.1f}")
-                self.spec_vel_chart.set_data(freqs[mask], amps[mask], 
+                max_freq = np.max(freq_masked) if len(freq_masked) > 0 else 0
+                print(f"[DEBUG] ВЧ: data_len={len(freq_masked)}, freq_range=({np.min(freq_masked):.2f}-{max_freq:.2f}), peaks={len(vch_peaks)}, freqs={peak_freqs}")
+                self.spec_vel_chart.set_data(freq_masked, amps_masked, 
                                             peak_frequencies=peak_freqs,
                                             peak_numbers=peak_nums)
             else:
@@ -602,12 +606,14 @@ class AnalysisDataScreen(QWidget):
             if len(hf) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(hf, fs)
                 mask = (freqs >= 0) & (freqs <= 12000)
+                freq_masked = freqs[mask]
+                amps_masked = amps[mask]
                 # Получаем ТОЛЬКО ВЧ(ф) пики
                 vchf_peaks = self._current_peaks.get('ВЧ(ф)', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in vchf_peaks]
                 peak_nums = [p['global_number'] for p in vchf_peaks]
-                print(f"[DEBUG] ВЧ(ф) пики: {len(vchf_peaks)}, freqs={peak_freqs}")
-                self.spec_hf_chart.set_data(freqs[mask], amps[mask], 
+                print(f"[DEBUG] ВЧ(ф): data_len={len(freq_masked)}, freq_range=({np.min(freq_masked):.2f}-{np.max(freq_masked):.2f}), peaks={len(vchf_peaks)}, freqs={peak_freqs}")
+                self.spec_hf_chart.set_data(freq_masked, amps_masked, 
                                            peak_frequencies=peak_freqs,
                                            peak_numbers=peak_nums)
             else:
