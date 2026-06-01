@@ -520,11 +520,24 @@ class AnalysisDataScreen(QWidget):
         for idx, peak in enumerate(top_peaks):
             peak['global_number'] = idx + 1
         
+        # Фильтруем пики по диапазонам частот (защита от неверных данных)
+        nch_peaks = [p for p in top_peaks if p['signal_type'] == 'НЧ' and 0.1 <= p['frequency'] <= 10]
+        vch_peaks = [p for p in top_peaks if p['signal_type'] == 'ВЧ' and 10 <= p['frequency'] <= 1000]
+        vchf_peaks = [p for p in top_peaks if p['signal_type'] == 'ВЧ(ф)' and 0 <= p['frequency'] <= 12000]
+        
         self._current_peaks = {
-            'НЧ': [p for p in top_peaks if p['signal_type'] == 'НЧ'],
-            'ВЧ': [p for p in top_peaks if p['signal_type'] == 'ВЧ'],
-            'ВЧ(ф)': [p for p in top_peaks if p['signal_type'] == 'ВЧ(ф)'],
+            'НЧ': nch_peaks,
+            'ВЧ': vch_peaks,
+            'ВЧ(ф)': vchf_peaks,
         }
+
+        print(f"[DEBUG] _current_peaks: НЧ={len(nch_peaks)}, ВЧ={len(vch_peaks)}, ВЧ(ф)={len(vchf_peaks)}")
+        if nch_peaks:
+            print(f"[DEBUG]   НЧ freqs: {[p['frequency'] for p in nch_peaks]}")
+        if vch_peaks:
+            print(f"[DEBUG]   ВЧ freqs: {[p['frequency'] for p in vch_peaks]}")
+        if vchf_peaks:
+            print(f"[DEBUG]   ВЧ(ф) freqs: {[p['frequency'] for p in vchf_peaks]}")
 
     def _update_time_series(self, data):
         """Обновить графики временных рядов."""
