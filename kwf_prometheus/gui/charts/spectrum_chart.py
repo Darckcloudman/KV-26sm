@@ -27,7 +27,7 @@ VEL_THRESHOLDS = {'A': 3.5, 'B': 5.0, 'C': 7.5}
 
 
 class BlinkingPeakMarker:
-    """Анимированный маркер пика с мигающей точкой и tooltip."""
+    """Анимированный маркер пика с мигающей точкой (стиль Home) и tooltip."""
     
     def __init__(self, plot_widget, x: float, y: float, number: int, 
                  size: float = 6.0, blink_interval_ms: int = 500):
@@ -55,13 +55,14 @@ class BlinkingPeakMarker:
         self.blink_timer.timeout.connect(self._toggle_visibility)
         self.blink_timer.start(blink_interval_ms)
         
-        # Красная точка (ScatterPlotItem) - радиус 3px (size=6)
+        # Красная точка с белым центром (стиль Home экрана)
+        # Используем symbol='o' с разной заливкой для создания эффекта кольца
         self.scatter = pg.ScatterPlotItem(
             x=[x],
             y=[y],
             size=size,
-            pen=pg.mkPen(color='#DD2C00', width=1),
-            brush=pg.mkBrush(color='#DD2C00' if self.show_dots else '#DD2C0000'),
+            pen=pg.mkPen(color='#DD2C00', width=2),  # Красный контур
+            brush=pg.mkBrush(color='#DD2C00' if self.show_dots else '#DD2C0000'),  # Красная заливка
             symbol='o',
             zValue=100
         )
@@ -317,9 +318,9 @@ class SpectrumChart(QWidget):
         # Получаем максимальную частоту в данных (важно для ВЧ спектра!)
         max_data_freq = np.max(freq_data)
 
-        # Ищем и отображаем пики, которые есть в текущих данных графика
+        # Ищем и отображаем пики
         for i, peak_freq in enumerate(peak_frequencies[:10]):
-            # ПРОВЕРКА: Пик не должен быть дальше максимальной частоты данных
+            # ПРОВЕРКА 1: Пик не должен быть дальше максимальной частоты данных
             if peak_freq > max_data_freq * 1.1:  # 10% запас
                 continue  # Пик вне диапазона данных, пропускаем
 
@@ -328,17 +329,10 @@ class SpectrumChart(QWidget):
             closest_freq = freq_data[closest_idx]
             peak_amp = amplitude_data[closest_idx]
 
-            # Проверяем, что пик действительно близок к данным графика (допуск 20%)
-            freq_range = self.freq_range[1] - self.freq_range[0]
-            tolerance = max(freq_range * 0.2, 1.0)  # 20% или минимум 1 Гц
-            
-            if abs(closest_freq - peak_freq) > tolerance:
-                continue  # Пик слишком далеко, пропускаем
-
             # Получаем номер пика из таблицы
             peak_number = peak_numbers[i] if i < len(peak_numbers) else (i + 1)
 
-            # size=6 в pyqtgraph = диаметр ~6px, радиус ~3px
+            # Создаём маркер
             marker = BlinkingPeakMarker(
                 self.plot_widget,
                 x=peak_freq,

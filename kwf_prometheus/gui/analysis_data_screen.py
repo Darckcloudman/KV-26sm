@@ -565,6 +565,7 @@ class AnalysisDataScreen(QWidget):
                 nch_peaks = self._current_peaks.get('НЧ', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in nch_peaks]
                 peak_nums = [p['global_number'] for p in nch_peaks]
+                print(f"[DEBUG] НЧ пики: {len(nch_peaks)}, freqs={peak_freqs}")
                 self.spec_acc_chart.set_data(freqs[mask], amps[mask], 
                                             peak_frequencies=peak_freqs,
                                             peak_numbers=peak_nums)
@@ -584,6 +585,8 @@ class AnalysisDataScreen(QWidget):
                 vch_peaks = self._current_peaks.get('ВЧ', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in vch_peaks]
                 peak_nums = [p['global_number'] for p in vch_peaks]
+                max_freq = np.max(freqs[mask]) if len(freqs[mask]) > 0 else 0
+                print(f"[DEBUG] ВЧ пики: {len(vch_peaks)}, freqs={peak_freqs}, max_data_freq={max_freq:.1f}")
                 self.spec_vel_chart.set_data(freqs[mask], amps[mask], 
                                             peak_frequencies=peak_freqs,
                                             peak_numbers=peak_nums)
@@ -603,6 +606,7 @@ class AnalysisDataScreen(QWidget):
                 vchf_peaks = self._current_peaks.get('ВЧ(ф)', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in vchf_peaks]
                 peak_nums = [p['global_number'] for p in vchf_peaks]
+                print(f"[DEBUG] ВЧ(ф) пики: {len(vchf_peaks)}, freqs={peak_freqs}")
                 self.spec_hf_chart.set_data(freqs[mask], amps[mask], 
                                            peak_frequencies=peak_freqs,
                                            peak_numbers=peak_nums)
