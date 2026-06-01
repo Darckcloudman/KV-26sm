@@ -528,7 +528,7 @@ class HomeScreen(QWidget):
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(8)
+        left_layout.setSpacing(20)
 
         btn_style = """
             QPushButton {
@@ -559,14 +559,6 @@ class HomeScreen(QWidget):
         self.dir_btn.setStyleSheet(btn_style)
         self.dir_btn.clicked.connect(self._select_directory)
         left_layout.addWidget(self.dir_btn)
-
-        # --- Автопарсинг (v1.4) ---
-        self.auto_scan_checkbox = QCheckBox("Автоматически импортировать новые архивы")
-        self.auto_scan_checkbox.setStyleSheet(CHECKBOX_STYLE)
-        self.auto_scan_checkbox.setChecked(self.auto_scan_service is not None and self.auto_scan_service.enabled)
-        self.auto_scan_checkbox.stateChanged.connect(self._on_auto_scan_toggled)
-        left_layout.addWidget(self.auto_scan_checkbox)
-        # --- Конец автопарсинга ---
 
         # Таблица
         table_frame = QFrame()
@@ -699,7 +691,7 @@ class HomeScreen(QWidget):
         # --- Правая колонка: схема + статусы ---
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(35, 0, 0, 0)
         right_layout.setSpacing(8)
 
         # Схема
@@ -1071,19 +1063,6 @@ class HomeScreen(QWidget):
         self.parse_thread.load_result.connect(self._on_load_result)  # Новый сигнал
         self.parse_thread.start()
 
-    # === Автопарсинг (v1.4) ===
-    
-    def _on_auto_scan_toggled(self, state):
-        """Включить/выключить автопарсинг."""
-        if self.auto_scan_service is not None:
-            self.auto_scan_service.enabled = (state == Qt.CheckState.Checked)
-            if self.auto_scan_service.enabled:
-                self.auto_scan_service.start_timer(self)
-            else:
-                self.auto_scan_service.stop_timer()
-    
-    # === Конец автопарсинга ===
-
     def _on_load_result(self, result: Dict):
         """Обработчик результатов загрузки (дедупликация)."""
         # Сохраняем для использования в _on_parse_finished
@@ -1128,32 +1107,11 @@ class HomeScreen(QWidget):
         self._update_sensor_statuses()
         self.analyze_btn.setEnabled(True)
 
-        # Показываем результаты дедупликации
-        result = getattr(self, '_last_load_result', {})
-        added = result.get('added', 0)
-        skipped = result.get('skipped', 0)
-        
-        if added > 0 or skipped > 0:
-            # Показываем уведомление в статус-баре главного окна
-            from .main_window import MainWindow
-            main_win = self.window()
-            if isinstance(main_win, MainWindow):
-                if skipped > 0:
-                    main_win.show_status_message(
-                        f"Загружено: {added} новых, пропущено: {skipped} дубликатов",
-                        "mdi.info"
-                    )
-                else:
-                    main_win.show_status_message(
-                        f"Загружено {added} новых записей",
-                        "mdi.check-circle"
-                    )
-
     def _on_parse_error(self, error_msg):
         """Обработчик ошибки загрузки."""
         self._hide_loading_spinner()
         self._is_loading = False
-        
+
         # Разблокируем таблицу и кнопки
         self.archive_table.setEnabled(True)
         self.load_btn.setEnabled(True)

@@ -2,9 +2,10 @@
 
 import pyqtgraph as pg
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-from PySide6.QtGui import QColor
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import Qt, QTimer
 import numpy as np
+from typing import List
 
 
 # Цвета зон ISO 10816
@@ -19,6 +20,102 @@ ZONE_COLORS = {
 ACC_THRESHOLDS = {'A': 1.0, 'B': 2.5, 'C': 5.0}
 # Пороги для скорости (мм/с) — ВЧ 10-1000 Гц
 VEL_THRESHOLDS = {'A': 2.3, 'B': 4.5, 'C': 11.2}
+
+
+class BlinkingPeakMarker:
+    """Анимированный маркер пика с мигающей точкой и номером."""
+    
+    def __init__(self, plot_widget, x: float, y: float, number: int, 
+                 size: float = 6.0, blink_interval_ms: int = 500):
+        """
+        Инициализация маркера пика.
+        
+        Args:
+            plot_widget: PyqtGraph PlotWidget
+            x: Координата X (частота)
+            y: Координата Y (амплитуда)
+            number: Номер пика (1, 2, 3...)
+            size: Диаметр точки в пикселях (~6px = радиус 3px)
+            blink_interval_ms: Интервал мигания в миллисекундах
+        """
+        self.plot_widget = plot_widget
+        self.x = x
+        self.y = y
+        self.number = number
+        self.size = size
+        self.visible = True
+        self.show_dots = True
+        
+        # Создаём таймер для мигания
+        self.blink_timer = QTimer()
+        self.blink_timer.timeout.connect(self._toggle_visibility)
+        self.blink_timer.start(blink_interval_ms)
+        
+        # Красная точка (ScatterPlotItem)
+        self.scatter = pg.ScatterPlotItem(
+            x=[x],
+            y=[y],
+            size=size,
+            pen=pg.mkPen(color='#DD2C00', width=1.5),
+            brush=pg.mkBrush(color='#DD2C00' if self.show_dots else '#DD2C0000'),
+            symbol='o',
+            zValue=100
+        )
+        self.plot_widget.addItem(self.scatter)
+        
+        # Номер пика (TextItem) - мелкий шрифт
+        self.text = pg.TextItem(
+            text=str(number),
+            color='#FFFFFF',
+            anchor=(0, 0)
+        )
+        # Настраиваем шрифт через объект QFont
+        font = QFont('Arial', 8)  # Шрифт Arial, размер 8pt
+        self.text.setFont(font)
+        # Смещаем текст чуть выше и правее точки
+        self.text.setPos(x + size * 0.8, y * 1.02)
+        self.plot_widget.addItem(self.text)
+    
+    def _toggle_visibility(self):
+        """Переключить видимость точки (мигание)."""
+        self.show_dots = not self.show_dots
+        
+        if self.show_dots:
+            self.scatter.setBrush(pg.mkBrush(color='#DD2C00'))
+        else:
+            self.scatter.setBrush(pg.mkBrush(color='#DD2C0000'))
+    
+    def update_position(self, x: float, y: float):
+        """Обновить позицию маркера."""
+        self.x = x
+        self.y = y
+        self.scatter.setData(x=[x], y=[y])
+        self.text.setPos(x + self.size * 0.8, y * 1.02)
+    
+    def set_number(self, number: int):
+        """Обновить номер пика."""
+        self.number = number
+        self.text.setText(str(number))
+    
+    def hide(self):
+        """Скрыть маркер."""
+        self.visible = False
+        self.scatter.hide()
+        self.text.hide()
+        self.blink_timer.stop()
+    
+    def show(self):
+        """Показать маркер."""
+        self.visible = True
+        self.scatter.show()
+        self.text.show()
+        self.blink_timer.start()
+    
+    def cleanup(self):
+        """Удалить маркер из графика и остановить таймер."""
+        self.blink_timer.stop()
+        self.plot_widget.removeItem(self.scatter)
+        self.plot_widget.removeItem(self.text)
 
 
 class SpectrumChart(QWidget):
@@ -39,10 +136,11 @@ class SpectrumChart(QWidget):
         self.x_label = x_label
         self.y_label = y_label
         self.freq_range = freq_range
-        self.thresholds = thresholds  # {'A': val, 'B': val, 'C': val}
+        self.thresholds = thresholds
         self.highlight_peaks = highlight_peaks
         self._zone_items = []
         self._threshold_lines = []
+        self._peak_markers: List[BlinkingPeakMarker] = []
         self.setup_ui()
 
     def setup_ui(self) -> None:
@@ -159,7 +257,9 @@ class SpectrumChart(QWidget):
         self,
         freq_data: np.ndarray,
         amplitude_data: np.ndarray,
-        peak_range: tuple | None = None
+        peak_range: tuple | None = None,
+        peak_frequencies: list | None = None,
+        peak_numbers: list | None = None
     ) -> None:
         """
         Установить данные для спектра.
@@ -168,6 +268,8 @@ class SpectrumChart(QWidget):
             freq_data: Массив частот (Гц).
             amplitude_data: Массив амплитуд.
             peak_range: Диапазон частот для подсветки пиков (min_freq, max_freq).
+            peak_frequencies: Список частот пиков для отображения с нумерацией.
+            peak_numbers: Список номеров пиков из таблицы (для соответствия нумерации).
         """
         # Фильтруем данные по диапазону частот
         mask = (freq_data >= self.freq_range[0]) & (freq_data <= self.freq_range[1])
@@ -186,30 +288,68 @@ class SpectrumChart(QWidget):
             self._draw_zone_backgrounds(y_range * 1.1)
             self._draw_threshold_lines()
 
-        # Подсветка пиков
-        if self.highlight_peaks and peak_range:
-            self._add_peak_highlight(peak_range)
+            # Отображаем пики с нумерацией
+            if peak_frequencies and len(peak_frequencies) > 0:
+                self._add_peak_markers(freq_filtered, amplitude_filtered, peak_frequencies, peak_numbers)
+        else:
+            self.plot_widget.setYRange(0, 1)
 
-    def _add_peak_highlight(self, peak_range: tuple) -> None:
-        """Добавить полупрозрачную подсветку области пиков."""
-        if self.highlight_item:
-            self.plot_widget.removeItem(self.highlight_item)
+    def _add_peak_markers(
+        self,
+        freq_data: np.ndarray,
+        amplitude_data: np.ndarray,
+        peak_frequencies: list,
+        peak_numbers: list | None = None
+    ) -> None:
+        """
+        Добавить анимированные маркеры пиков с нумерацией на график.
 
-        min_freq, max_freq = peak_range
-        view_range = self.plot_widget.viewRange()
-        y_max = view_range[1][1] if view_range else 1.0
+        Args:
+            freq_data: Массив частот.
+            amplitude_data: Массив амплитуд.
+            peak_frequencies: Список частот пиков для отображения.
+            peak_numbers: Список номеров пиков из таблицы (для соответствия нумерации).
+        """
+        # Удаляем старые маркеры
+        self._clear_peak_markers()
 
-        self.highlight_item = pg.LinearRegionItem(
-            values=[min_freq, max_freq],
-            brush=QColor(0, 200, 83, 30),
-            movable=False
-        )
-        self.plot_widget.addItem(self.highlight_item)
+        if not peak_frequencies:
+            return
+
+        # Если номера пиков не переданы, используем порядковые номера
+        if peak_numbers is None or len(peak_numbers) == 0:
+            peak_numbers = list(range(1, len(peak_frequencies) + 1))
+
+        # Отображаем все пики из списка (до 10)
+        for i, peak_freq in enumerate(peak_frequencies[:10]):
+            # Ищем ближайшее значение частоты в данных
+            closest_idx = np.argmin(np.abs(freq_data - peak_freq))
+            peak_amp = amplitude_data[closest_idx]
+
+            # Получаем номер пика из таблицы
+            peak_number = peak_numbers[i] if i < len(peak_numbers) else (i + 1)
+
+            # size=6 в pyqtgraph = диаметр ~6px, радиус ~3px
+            marker = BlinkingPeakMarker(
+                self.plot_widget,
+                x=peak_freq,
+                y=peak_amp,
+                number=peak_number,
+                size=6.0,
+                blink_interval_ms=500
+            )
+            self._peak_markers.append(marker)
+
+    def _clear_peak_markers(self) -> None:
+        """Удалить все маркеры пиков."""
+        for marker in self._peak_markers:
+            marker.cleanup()
+        self._peak_markers.clear()
 
     def clear(self) -> None:
         """Очистить график."""
         self.curve.clear()
-        if self.highlight_item:
+        if hasattr(self, 'highlight_item') and self.highlight_item:
             self.plot_widget.removeItem(self.highlight_item)
             self.highlight_item = None
         for item in self._zone_items:
@@ -218,6 +358,8 @@ class SpectrumChart(QWidget):
         for line in self._threshold_lines:
             self.plot_widget.removeItem(line)
         self._threshold_lines.clear()
+        # Очистка маркеров пиков
+        self._clear_peak_markers()
         self.plot_widget.setYRange(0, 1)
 
     def clear_data(self) -> None:

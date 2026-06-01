@@ -453,38 +453,40 @@ class AnalysisDataScreen(QWidget):
         all_peaks = []
 
         # Собираем пики из всех трёх спектров
-        for signal_type, freq_key, amp_key, unit, thresholds in [
+        signal_configs = [
             ('НЧ', 'acceleration', 'acceleration_fs', 'м/с²', ACC_THRESHOLDS),
             ('ВЧ', 'velocity', 'velocity_fs', 'мм/с', VEL_THRESHOLDS),
             ('ВЧ(ф)', 'high_freq', 'high_freq_fs', 'м/с²', ACC_THRESHOLDS),
-        ]:
-            if data.get(signal_type.lower().replace('(ф)', '_freq')) is not None:
-                signal_data = data.get(signal_type.lower().replace('(ф)', '_freq'))
-                fs = data.get(freq_key)
-                if signal_data is not None and fs and len(signal_data) > 0:
-                    freqs, amps = analyzer.calculate_spectrum(np.array(signal_data), fs)
-                    peaks = self._find_top_peaks(freqs, amps, top_n=5)
-                    for peak in peaks:
-                        # Определяем зону по амплитуде
-                        zone = '-'
-                        if unit == 'м/с²':
-                            zone = analyzer.determine_zone_acc(peak['amplitude'])
-                        elif unit == 'мм/с':
-                            zone = analyzer.determine_zone_vel(peak['amplitude'])
+        ]
+        
+        for signal_name, signal_key, fs_key, unit, thresholds in signal_configs:
+            signal_data = data.get(signal_key)
+            fs = data.get(fs_key)
+            
+            if signal_data is not None and fs and len(signal_data) > 0:
+                freqs, amps = analyzer.calculate_spectrum(np.array(signal_data), fs)
+                peaks = self._find_top_peaks(freqs, amps, top_n=5)
+                
+                for peak in peaks:
+                    zone = '-'
+                    if unit == 'м/с²':
+                        zone = analyzer.determine_zone_acc(peak['amplitude'])
+                    elif unit == 'мм/с':
+                        zone = analyzer.determine_zone_vel(peak['amplitude'])
 
-                        all_peaks.append({
-                            'signal_type': signal_type,
-                            'frequency': peak['frequency'],
-                            'amplitude': peak['amplitude'],
-                            'zone': zone,
-                            'unit': unit
-                        })
+                    all_peaks.append({
+                        'signal_type': signal_name,
+                        'frequency': peak['frequency'],
+                        'amplitude': peak['amplitude'],
+                        'zone': zone,
+                        'unit': unit
+                    })
 
         # Сортируем все пики по амплитуде
         all_peaks.sort(key=lambda x: x['amplitude'], reverse=True)
         top_peaks = all_peaks[:10]
 
-        # Заполняем таблицу
+        # Заполняем таблицу (4 колонки: Пик, Тип, Частота, Амплитуда+Зона)
         for row_idx, peak in enumerate(top_peaks):
             self.harmonics_table.insertRow(row_idx)
 
@@ -513,6 +515,17 @@ class AnalysisDataScreen(QWidget):
             item3.setForeground(QColor(zone_color))
             self.harmonics_table.setItem(row_idx, 3, item3)
 
+        # Сохраняем пики для отображения на графиках
+        # Добавляем глобальный номер пика (из таблицы)
+        for idx, peak in enumerate(top_peaks):
+            peak['global_number'] = idx + 1
+        
+        self._current_peaks = {
+            'НЧ': [p for p in top_peaks if p['signal_type'] == 'НЧ'],
+            'ВЧ': [p for p in top_peaks if p['signal_type'] == 'ВЧ'],
+            'ВЧ(ф)': [p for p in top_peaks if p['signal_type'] == 'ВЧ(ф)'],
+        }
+
     def _update_time_series(self, data):
         """Обновить графики временных рядов."""
         if data.get('acceleration') is not None and data.get('acceleration_time') is not None:
@@ -538,40 +551,61 @@ class AnalysisDataScreen(QWidget):
             self.ts_vel_chart.clear()
 
     def _update_spectrums(self, data):
-        """Обновить графики спектров с порогами."""
+        """Обновить графики спектров с порогами и подсветкой пиков."""
         analyzer = VibrationAnalyzer()
 
+        # НЧ спектр
         if data.get('acceleration') is not None and data.get('acceleration_fs'):
             acc = np.array(data['acceleration'])
             fs = data['acceleration_fs']
             if len(acc) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(acc, fs)
                 mask = freqs <= 30
-                self.spec_acc_chart.set_data(freqs[mask], amps[mask])
+                # Получаем пики для НЧ
+                nch_peaks = self._current_peaks.get('НЧ', []) if hasattr(self, '_current_peaks') else []
+                peak_freqs = [p['frequency'] for p in nch_peaks]
+                peak_nums = [p['global_number'] for p in nch_peaks]
+                self.spec_acc_chart.set_data(freqs[mask], amps[mask], 
+                                            peak_frequencies=peak_freqs,
+                                            peak_numbers=peak_nums)
             else:
                 self.spec_acc_chart.clear()
         else:
             self.spec_acc_chart.clear()
 
+        # ВЧ спектр
         if data.get('velocity') is not None and data.get('velocity_fs'):
             vel = np.array(data['velocity'])
             fs = data['velocity_fs']
             if len(vel) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(vel, fs)
                 mask = freqs <= 1200
-                self.spec_vel_chart.set_data(freqs[mask], amps[mask])
+                # Получаем пики для ВЧ
+                vch_peaks = self._current_peaks.get('ВЧ', []) if hasattr(self, '_current_peaks') else []
+                peak_freqs = [p['frequency'] for p in vch_peaks]
+                peak_nums = [p['global_number'] for p in vch_peaks]
+                self.spec_vel_chart.set_data(freqs[mask], amps[mask], 
+                                            peak_frequencies=peak_freqs,
+                                            peak_numbers=peak_nums)
             else:
                 self.spec_vel_chart.clear()
         else:
             self.spec_vel_chart.clear()
 
+        # ВЧ(ф) спектр
         if data.get('high_freq') is not None and data.get('high_freq_fs'):
             hf = np.array(data['high_freq'])
             fs = data['high_freq_fs']
             if len(hf) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(hf, fs)
                 mask = freqs <= 12000
-                self.spec_hf_chart.set_data(freqs[mask], amps[mask])
+                # Получаем пики для ВЧ(ф)
+                vchf_peaks = self._current_peaks.get('ВЧ(ф)', []) if hasattr(self, '_current_peaks') else []
+                peak_freqs = [p['frequency'] for p in vchf_peaks]
+                peak_nums = [p['global_number'] for p in vchf_peaks]
+                self.spec_hf_chart.set_data(freqs[mask], amps[mask], 
+                                           peak_frequencies=peak_freqs,
+                                           peak_numbers=peak_nums)
             else:
                 self.spec_hf_chart.clear()
         else:

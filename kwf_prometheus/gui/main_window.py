@@ -147,6 +147,41 @@ class MainWindow(QMainWindow):
         """)
         main_layout.addWidget(self.tabs)
 
+        # Статус-бар с индикатором прогресса
+        self.status_bar = QStatusBar(self)
+        self.status_bar.setStyleSheet(STATUSBAR_STYLE)
+        self.setStatusBar(self.status_bar)
+        
+        # Иконка состояния (слева) — только иконка из QtAwesome
+        self.status_icon = QLabel()
+        self.status_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_icon.setStyleSheet(STATUSBAR_ICON_STYLE)
+        self.status_bar.addPermanentWidget(self.status_icon, stretch=0)
+        
+        # Индикатор прогресса (справа) — скрыт по умолчанию
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedWidth(120)
+        self.progress_bar.setFixedHeight(14)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setStyleSheet(PROGRESSBAR_STYLE)
+        self.status_bar.addPermanentWidget(self.progress_bar, stretch=0)
+
+        # Метка времени (справа)
+        self.time_label = QLabel("")
+        self.time_label.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px; padding: 0px 8px;")
+        self.status_bar.addPermanentWidget(self.time_label, stretch=0)
+        
+        # Индикатор режима (PostgreSQL / Файловый)
+        self.mode_indicator = QLabel()
+        self.mode_indicator.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px; padding: 0px 8px;")
+        self.status_bar.addPermanentWidget(self.mode_indicator, stretch=0)
+        
+        # Таймер для обновления времени
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._update_time)
+        self.timer.start(1000)
+        self._update_time()
+
         # Вкладка Home (передаём репозиторий и сервисы)
         self.home_screen = HomeScreen(
             repository=self.repository,
@@ -178,45 +213,9 @@ class MainWindow(QMainWindow):
         self.trends_screen = TrendsScreen(repository=self.repository)
         self.tabs.addTab(self.trends_screen, "Тренды")
 
-        # Статус-бар с индикатором прогресса
-        self.status_bar = QStatusBar(self)
-        self.status_bar.setStyleSheet(STATUSBAR_STYLE)
-        self.setStatusBar(self.status_bar)
-        
-        # Иконка состояния (слева) — только иконка из QtAwesome
-        self.status_icon = QLabel()
-        self.status_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_icon.setStyleSheet(STATUSBAR_ICON_STYLE)
-        self._update_status_icon("ready")  # Иконка готовности
-        self.status_bar.addPermanentWidget(self.status_icon, stretch=0)
-        
-        # Индикатор прогресса (справа) — скрыт по умолчанию
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedWidth(120)
-        self.progress_bar.setFixedHeight(14)
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setStyleSheet(PROGRESSBAR_STYLE)
-        self.status_bar.addPermanentWidget(self.progress_bar, stretch=0)
-
-        # Метка времени (справа)
-        self.time_label = QLabel("")
-        self.time_label.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px; padding: 0px 8px;")
-        self.status_bar.addPermanentWidget(self.time_label, stretch=0)
-        
-        # Индикатор режима (PostgreSQL / Файловый)
-        self.mode_indicator = QLabel()
-        self.mode_indicator.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 10px; padding: 0px 8px;")
-        self.status_bar.addPermanentWidget(self.mode_indicator, stretch=0)
-        self._update_mode_indicator()
-        
-        # Таймер для обновления времени
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self._update_time)
-        self.timer.start(1000)
-        self._update_time()
-
         # Инициализация иконки статуса
         self._update_status_icon('db' if self.repository_switcher.mode == 'postgres' else 'file')
+        self._update_mode_indicator()
 
     def _on_upload_info_requested(self, parser):
         """Перейти на экран информации о загрузке."""
@@ -486,16 +485,20 @@ class MainWindow(QMainWindow):
     def _on_connection_success(self, info: str):
         """Обработка успешного подключения."""
         logger.info(info)
-        self._update_mode_indicator()
+        if hasattr(self, 'mode_indicator'):
+            self._update_mode_indicator()
 
     def _on_connection_failed(self, error: str):
         """Обработка ошибки подключения."""
         logger.error(error)
-        show_warning(self, "Ошибка подключения", error)
-        self._update_mode_indicator()
+        if hasattr(self, 'mode_indicator'):
+            show_warning(self, "Ошибка подключения", error)
+            self._update_mode_indicator()
 
     def _on_mode_changed(self, mode: str):
         """Обработка смены режима."""
+        if not hasattr(self, 'status_icon'):
+            return
         self._update_status_icon('db' if mode == 'postgres' else 'file')
         self._update_mode_indicator()
         
