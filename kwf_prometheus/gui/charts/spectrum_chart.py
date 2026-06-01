@@ -26,43 +26,48 @@ ACC_THRESHOLDS = {'A': 1.0, 'B': 2.5, 'C': 5.0}
 VEL_THRESHOLDS = {'A': 3.5, 'B': 5.0, 'C': 7.5}
 
 
-class BlinkingPeakMarker:
-    """Анимированный маркер пика с мигающей точкой (стиль Home) и tooltip."""
+class PulsatingPeakMarker:
+    """Анимированный пульсирующий маркер пика (Pulsating Peak Marker) с tooltip."""
     
     def __init__(self, plot_widget, x: float, y: float, number: int, 
-                 size: float = 6.0, blink_interval_ms: int = 500):
+                 base_size: float = 6.0, pulse_speed_ms: int = 1000):
         """
-        Инициализация маркера пика.
+        Инициализация пульсирующего маркера пика.
         
         Args:
             plot_widget: PyqtGraph PlotWidget
             x: Координата X (частота)
             y: Координата Y (амплитуда)
             number: Номер пика (1, 2, 3...)
-            size: Диаметр точки в пикселях (~6px = радиус 3px)
-            blink_interval_ms: Интервал мигания в миллисекундах
+            base_size: Базовый размер точки в пикселях (диаметр)
+            pulse_speed_ms: Скорость пульсации (полный цикл в мс)
         """
         self.plot_widget = plot_widget
         self.x = x
         self.y = y
         self.number = number
-        self.size = size
+        self.base_size = base_size
+        self.pulse_speed_ms = pulse_speed_ms
         self.visible = True
-        self.show_dots = True
         
-        # Создаём таймер для мигания
-        self.blink_timer = QTimer()
-        self.blink_timer.timeout.connect(self._toggle_visibility)
-        self.blink_timer.start(blink_interval_ms)
+        # Текущий размер (будет анимироваться от base_size/2 до base_size*1.5)
+        self.current_size = base_size
+        self.pulse_phase = 0.0  # 0.0 - 1.0 (фаза синусоиды)
+        
+        # Создаём таймер для пульсации
+        self.pulse_timer = QTimer()
+        self.pulse_timer.timeout.connect(self._update_pulse)
+        # Обновляем 60 FPS для плавности
+        self.pulse_timer.start(pulse_speed_ms // 60)
         
         # Красная точка с белым центром (стиль Home экрана)
-        # Используем symbol='o' с разной заливкой для создания эффекта кольца
+        # Используем symbol='o' с красной заливкой и белым контуром
         self.scatter = pg.ScatterPlotItem(
             x=[x],
             y=[y],
-            size=size,
-            pen=pg.mkPen(color='#DD2C00', width=2),  # Красный контур
-            brush=pg.mkBrush(color='#DD2C00' if self.show_dots else '#DD2C0000'),  # Красная заливка
+            size=base_size,
+            pen=pg.mkPen(color='#FFFFFF', width=1.5),  # Белый контур
+            brush=pg.mkBrush(color='#DD2C00'),  # Красная заливка
             symbol='o',
             zValue=100
         )
@@ -70,14 +75,19 @@ class BlinkingPeakMarker:
         self.scatter.setToolTip(f'Пик #{number}\nЧастота: {x:.2f} Гц\nАмплитуда: {y:.6f}')
         self.plot_widget.addItem(self.scatter)
         
-    def _toggle_visibility(self):
-        """Переключить видимость точки (мигание)."""
-        self.show_dots = not self.show_dots
+    def _update_pulse(self):
+        """Обновить размер точки для эффекта пульсации."""
+        # Синусоидальная пульсация: от 0.5x до 1.5x базового размера
+        self.pulse_phase += 0.016  # ~60 FPS
+        if self.pulse_phase > 6.28:  # 2*PI
+            self.pulse_phase = 0.0
         
-        if self.show_dots:
-            self.scatter.setBrush(pg.mkBrush(color='#DD2C00'))
-        else:
-            self.scatter.setBrush(pg.mkBrush(color='#DD2C0000'))
+        # Амплитуда пульсации: 0.5 до 1.5 от базового размера
+        scale = 1.0 + 0.5 * np.sin(self.pulse_phase)
+        self.current_size = self.base_size * scale
+        
+        # Обновляем размер точки
+        self.scatter.setSize(self.current_size)
     
     def update_position(self, x: float, y: float):
         """Обновить позицию маркера."""
@@ -95,17 +105,17 @@ class BlinkingPeakMarker:
         """Скрыть маркер."""
         self.visible = False
         self.scatter.hide()
-        self.blink_timer.stop()
+        self.pulse_timer.stop()
     
     def show(self):
         """Показать маркер."""
         self.visible = True
         self.scatter.show()
-        self.blink_timer.start()
+        self.pulse_timer.start()
     
     def cleanup(self):
         """Удалить маркер из графика и остановить таймер."""
-        self.blink_timer.stop()
+        self.pulse_timer.stop()
         self.plot_widget.removeItem(self.scatter)
 
 
@@ -131,7 +141,7 @@ class SpectrumChart(QWidget):
         self.highlight_peaks = highlight_peaks
         self._zone_items = []
         self._threshold_lines = []
-        self._peak_markers: List[BlinkingPeakMarker] = []
+        self._peak_markers: List[PulsatingPeakMarker] = []
         self.setup_ui()
 
     def setup_ui(self) -> None:
@@ -293,7 +303,7 @@ class SpectrumChart(QWidget):
         peak_numbers: list | None = None
     ) -> None:
         """
-        Добавить анимированные маркеры пиков с нумерацией на график.
+        Добавить пульсирующие маркеры пиков на график.
 
         Args:
             freq_data: Массив частот (уже отфильтрованный по диапазону графика).
@@ -338,16 +348,16 @@ class SpectrumChart(QWidget):
             # Получаем номер пика из таблицы
             peak_number = peak_numbers[i] if i < len(peak_numbers) else (i + 1)
 
-            print(f"[DEBUG] Добавлен пик #{peak_number} на {peak_freq:.2f} Гц, amp={peak_amp:.6f}")
+            print(f"[DEBUG] Добавлен пульсирующий пик #{peak_number} на {peak_freq:.2f} Гц, amp={peak_amp:.6f}")
 
-            # Создаём маркер
-            marker = BlinkingPeakMarker(
+            # Создаём пульсирующий маркер (Pulsating Peak Marker)
+            marker = PulsatingPeakMarker(
                 self.plot_widget,
                 x=peak_freq,
                 y=peak_amp,
                 number=peak_number,
-                size=6.0,
-                blink_interval_ms=500
+                base_size=6.0,  # Базовый размер 6px
+                pulse_speed_ms=1000  # Скорость пульсации 1 секунда
             )
             self._peak_markers.append(marker)
 
