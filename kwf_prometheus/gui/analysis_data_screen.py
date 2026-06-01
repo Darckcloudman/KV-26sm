@@ -554,6 +554,15 @@ class AnalysisDataScreen(QWidget):
         """Обновить графики спектров с порогами и подсветкой пиков."""
         analyzer = VibrationAnalyzer()
 
+        # Получаем все пики из таблицы (для передачи на все графики)
+        all_peaks = []
+        if hasattr(self, '_current_peaks'):
+            all_peaks = list(self._current_peaks.get('НЧ', []) + 
+                            self._current_peaks.get('ВЧ', []) + 
+                            self._current_peaks.get('ВЧ(ф)', []))
+        peak_freqs_all = [p['frequency'] for p in all_peaks]
+        peak_nums_all = [p['global_number'] for p in all_peaks]
+
         # НЧ спектр (0.1-10 Гц)
         if data.get('acceleration') is not None and data.get('acceleration_fs'):
             acc = np.array(data['acceleration'])
@@ -561,13 +570,10 @@ class AnalysisDataScreen(QWidget):
             if len(acc) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(acc, fs)
                 mask = (freqs >= 0.1) & (freqs <= 10)
-                # Получаем пики для НЧ
-                nch_peaks = self._current_peaks.get('НЧ', []) if hasattr(self, '_current_peaks') else []
-                peak_freqs = [p['frequency'] for p in nch_peaks]
-                peak_nums = [p['global_number'] for p in nch_peaks]
+                # Передаем ВСЕ пики, но график покажет только те, что в диапазоне
                 self.spec_acc_chart.set_data(freqs[mask], amps[mask], 
-                                            peak_frequencies=peak_freqs,
-                                            peak_numbers=peak_nums)
+                                            peak_frequencies=peak_freqs_all,
+                                            peak_numbers=peak_nums_all)
             else:
                 self.spec_acc_chart.clear()
         else:
@@ -580,13 +586,10 @@ class AnalysisDataScreen(QWidget):
             if len(vel) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(vel, fs)
                 mask = (freqs >= 10) & (freqs <= 1000)
-                # Получаем пики для ВЧ
-                vch_peaks = self._current_peaks.get('ВЧ', []) if hasattr(self, '_current_peaks') else []
-                peak_freqs = [p['frequency'] for p in vch_peaks]
-                peak_nums = [p['global_number'] for p in vch_peaks]
+                # Передаем ВСЕ пики, но график покажет только те, что в диапазоне
                 self.spec_vel_chart.set_data(freqs[mask], amps[mask], 
-                                            peak_frequencies=peak_freqs,
-                                            peak_numbers=peak_nums)
+                                            peak_frequencies=peak_freqs_all,
+                                            peak_numbers=peak_nums_all)
             else:
                 self.spec_vel_chart.clear()
         else:
@@ -599,13 +602,10 @@ class AnalysisDataScreen(QWidget):
             if len(hf) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(hf, fs)
                 mask = (freqs >= 0) & (freqs <= 12000)
-                # Получаем пики для ВЧ(ф)
-                vchf_peaks = self._current_peaks.get('ВЧ(ф)', []) if hasattr(self, '_current_peaks') else []
-                peak_freqs = [p['frequency'] for p in vchf_peaks]
-                peak_nums = [p['global_number'] for p in vchf_peaks]
+                # Передаем ВСЕ пики, но график покажет только те, что в диапазоне
                 self.spec_hf_chart.set_data(freqs[mask], amps[mask], 
-                                           peak_frequencies=peak_freqs,
-                                           peak_numbers=peak_nums)
+                                           peak_frequencies=peak_freqs_all,
+                                           peak_numbers=peak_nums_all)
             else:
                 self.spec_hf_chart.clear()
         else:

@@ -16,10 +16,14 @@ ZONE_COLORS = {
     'D': '#DD2C00',
 }
 
-# Пороги для ускорения (м/с²) — НЧ 0.1-10 Гц
+# Пороги для ускорения (м/с²) — НЧ 0.1-10 Гц (SG132)
 ACC_THRESHOLDS = {'A': 1.0, 'B': 2.5, 'C': 5.0}
-# Пороги для скорости (мм/с) — ВЧ 10-1000 Гц
-VEL_THRESHOLDS = {'A': 2.3, 'B': 4.5, 'C': 11.2}
+
+# Пороги для скорости (мм/с) — ВЧ 10-1000 Гц (SG132)
+# Базовый уровень (Норма): 1.5 - 3.5 мм/с
+# Уставка предупреждения (Внимание): ~4.5-5.0 мм/с
+# Уставка авария (Авария): 7.0-10.0 мм/с
+VEL_THRESHOLDS = {'A': 3.5, 'B': 5.0, 'C': 7.5}
 
 
 class BlinkingPeakMarker:
@@ -305,10 +309,10 @@ class SpectrumChart(QWidget):
         Добавить анимированные маркеры пиков с нумерацией на график.
 
         Args:
-            freq_data: Массив частот.
-            amplitude_data: Массив амплитуд.
+            freq_data: Массив частот (уже отфильтрованный по диапазону графика).
+            amplitude_data: Массив амплитуд (уже отфильтрованный).
             peak_frequencies: Список частот пиков для отображения.
-            peak_numbers: Список номеров пиков из таблицы (для соответствия нумерации).
+            peak_numbers: Список номеров пиков из таблицы.
         """
         # Удаляем старые маркеры
         self._clear_peak_markers()
@@ -320,23 +324,22 @@ class SpectrumChart(QWidget):
         if peak_numbers is None or len(peak_numbers) == 0:
             peak_numbers = list(range(1, len(peak_frequencies) + 1))
 
-        # Фильтруем пики по диапазону частот графика
-        min_freq = self.freq_range[0]
-        max_freq = self.freq_range[1]
-
+        # Ищем и отображаем пики, которые есть в текущих данных графика
         for i, peak_freq in enumerate(peak_frequencies[:10]):
-            # Пропускаем пики вне диапазона частот графика
-            if peak_freq < min_freq or peak_freq > max_freq:
+            # Ищем ближайшее значение частоты в данных графика
+            if len(freq_data) == 0:
                 continue
 
-            # Ищем ближайшее значение частоты в данных
             closest_idx = np.argmin(np.abs(freq_data - peak_freq))
-            
-            # Проверяем, что найденная частота действительно близка к пику
-            if abs(freq_data[closest_idx] - peak_freq) > (max_freq - min_freq) * 0.1:
-                continue  # Пик слишком далеко от реальных данных
-            
+            closest_freq = freq_data[closest_idx]
             peak_amp = amplitude_data[closest_idx]
+
+            # Проверяем, что пик действительно близок к данным графика (допуск 20%)
+            freq_range = self.freq_range[1] - self.freq_range[0]
+            tolerance = max(freq_range * 0.2, 1.0)  # 20% или минимум 1 Гц
+            
+            if abs(closest_freq - peak_freq) > tolerance:
+                continue  # Пик слишком далеко, пропускаем
 
             # Получаем номер пика из таблицы
             peak_number = peak_numbers[i] if i < len(peak_numbers) else (i + 1)
