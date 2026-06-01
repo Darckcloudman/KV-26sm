@@ -279,11 +279,11 @@ class AnalysisDataScreen(QWidget):
         spec_layout = QHBoxLayout()
         spec_layout.setSpacing(10)
         self.spec_acc_chart = SpectrumChart(
-            'НЧ спектр (0.1-10 Гц)', 'Гц', 'м/с²', (0, 30),
+            'НЧ спектр (0.1-10 Гц)', 'Гц', 'м/с²', (0.1, 10),
             thresholds=ACC_THRESHOLDS
         )
         self.spec_vel_chart = SpectrumChart(
-            'ВЧ спектр (10-1000 Гц)', 'Гц', 'мм/с', (0, 1200),
+            'ВЧ спектр (10-1000 Гц)', 'Гц', 'мм/с', (10, 1000),
             thresholds=VEL_THRESHOLDS
         )
         self.spec_hf_chart = SpectrumChart(
@@ -554,13 +554,13 @@ class AnalysisDataScreen(QWidget):
         """Обновить графики спектров с порогами и подсветкой пиков."""
         analyzer = VibrationAnalyzer()
 
-        # НЧ спектр
+        # НЧ спектр (0.1-10 Гц)
         if data.get('acceleration') is not None and data.get('acceleration_fs'):
             acc = np.array(data['acceleration'])
             fs = data['acceleration_fs']
             if len(acc) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(acc, fs)
-                mask = freqs <= 30
+                mask = (freqs >= 0.1) & (freqs <= 10)
                 # Получаем пики для НЧ
                 nch_peaks = self._current_peaks.get('НЧ', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in nch_peaks]
@@ -573,13 +573,13 @@ class AnalysisDataScreen(QWidget):
         else:
             self.spec_acc_chart.clear()
 
-        # ВЧ спектр
+        # ВЧ спектр (10-1000 Гц)
         if data.get('velocity') is not None and data.get('velocity_fs'):
             vel = np.array(data['velocity'])
             fs = data['velocity_fs']
             if len(vel) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(vel, fs)
-                mask = freqs <= 1200
+                mask = (freqs >= 10) & (freqs <= 1000)
                 # Получаем пики для ВЧ
                 vch_peaks = self._current_peaks.get('ВЧ', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in vch_peaks]
@@ -592,13 +592,13 @@ class AnalysisDataScreen(QWidget):
         else:
             self.spec_vel_chart.clear()
 
-        # ВЧ(ф) спектр
+        # ВЧ(ф) спектр (0-12 кГц)
         if data.get('high_freq') is not None and data.get('high_freq_fs'):
             hf = np.array(data['high_freq'])
             fs = data['high_freq_fs']
             if len(hf) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(hf, fs)
-                mask = freqs <= 12000
+                mask = (freqs >= 0) & (freqs <= 12000)
                 # Получаем пики для ВЧ(ф)
                 vchf_peaks = self._current_peaks.get('ВЧ(ф)', []) if hasattr(self, '_current_peaks') else []
                 peak_freqs = [p['frequency'] for p in vchf_peaks]

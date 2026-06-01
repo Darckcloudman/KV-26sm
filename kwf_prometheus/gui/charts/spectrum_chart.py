@@ -320,10 +320,22 @@ class SpectrumChart(QWidget):
         if peak_numbers is None or len(peak_numbers) == 0:
             peak_numbers = list(range(1, len(peak_frequencies) + 1))
 
-        # Отображаем все пики из списка (до 10)
+        # Фильтруем пики по диапазону частот графика
+        min_freq = self.freq_range[0]
+        max_freq = self.freq_range[1]
+
         for i, peak_freq in enumerate(peak_frequencies[:10]):
+            # Пропускаем пики вне диапазона частот графика
+            if peak_freq < min_freq or peak_freq > max_freq:
+                continue
+
             # Ищем ближайшее значение частоты в данных
             closest_idx = np.argmin(np.abs(freq_data - peak_freq))
+            
+            # Проверяем, что найденная частота действительно близка к пику
+            if abs(freq_data[closest_idx] - peak_freq) > (max_freq - min_freq) * 0.1:
+                continue  # Пик слишком далеко от реальных данных
+            
             peak_amp = amplitude_data[closest_idx]
 
             # Получаем номер пика из таблицы
