@@ -2,7 +2,7 @@
 
 import pyqtgraph as pg
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt, QTimer
 import numpy as np
 from typing import List
@@ -27,7 +27,7 @@ VEL_THRESHOLDS = {'A': 3.5, 'B': 5.0, 'C': 7.5}
 
 
 class BlinkingPeakMarker:
-    """Анимированный маркер пика с мигающей точкой и номером."""
+    """Анимированный маркер пика с мигающей точкой и tooltip."""
     
     def __init__(self, plot_widget, x: float, y: float, number: int, 
                  size: float = 6.0, blink_interval_ms: int = 500):
@@ -55,31 +55,20 @@ class BlinkingPeakMarker:
         self.blink_timer.timeout.connect(self._toggle_visibility)
         self.blink_timer.start(blink_interval_ms)
         
-        # Красная точка (ScatterPlotItem)
+        # Красная точка (ScatterPlotItem) - радиус 3px (size=6)
         self.scatter = pg.ScatterPlotItem(
             x=[x],
             y=[y],
             size=size,
-            pen=pg.mkPen(color='#DD2C00', width=1.5),
+            pen=pg.mkPen(color='#DD2C00', width=1),
             brush=pg.mkBrush(color='#DD2C00' if self.show_dots else '#DD2C0000'),
             symbol='o',
             zValue=100
         )
+        # Добавляем tooltip
+        self.scatter.setToolTip(f'Пик #{number}\nЧастота: {x:.2f} Гц\nАмплитуда: {y:.6f}')
         self.plot_widget.addItem(self.scatter)
         
-        # Номер пика (TextItem) - мелкий шрифт
-        self.text = pg.TextItem(
-            text=str(number),
-            color='#FFFFFF',
-            anchor=(0, 0)
-        )
-        # Настраиваем шрифт через объект QFont
-        font = QFont('Arial', 8)  # Шрифт Arial, размер 8pt
-        self.text.setFont(font)
-        # Смещаем текст чуть выше и правее точки
-        self.text.setPos(x + size * 0.8, y * 1.02)
-        self.plot_widget.addItem(self.text)
-    
     def _toggle_visibility(self):
         """Переключить видимость точки (мигание)."""
         self.show_dots = not self.show_dots
@@ -94,32 +83,29 @@ class BlinkingPeakMarker:
         self.x = x
         self.y = y
         self.scatter.setData(x=[x], y=[y])
-        self.text.setPos(x + self.size * 0.8, y * 1.02)
+        self.scatter.setToolTip(f'Пик #{self.number}\nЧастота: {x:.2f} Гц\nАмплитуда: {y:.6f}')
     
     def set_number(self, number: int):
         """Обновить номер пика."""
         self.number = number
-        self.text.setText(str(number))
+        self.scatter.setToolTip(f'Пик #{number}\nЧастота: {self.x:.2f} Гц\nАмплитуда: {self.y:.6f}')
     
     def hide(self):
         """Скрыть маркер."""
         self.visible = False
         self.scatter.hide()
-        self.text.hide()
         self.blink_timer.stop()
     
     def show(self):
         """Показать маркер."""
         self.visible = True
         self.scatter.show()
-        self.text.show()
         self.blink_timer.start()
     
     def cleanup(self):
         """Удалить маркер из графика и остановить таймер."""
         self.blink_timer.stop()
         self.plot_widget.removeItem(self.scatter)
-        self.plot_widget.removeItem(self.text)
 
 
 class SpectrumChart(QWidget):
@@ -330,16 +316,11 @@ class SpectrumChart(QWidget):
 
         # Получаем максимальную частоту в данных (важно для ВЧ спектра!)
         max_data_freq = np.max(freq_data)
-        min_data_freq = np.min(freq_data)
-
-        # DEBUG вывод
-        print(f"[DEBUG] SpectrumChart: range={self.freq_range}, data_freq_range=({min_data_freq:.1f}-{max_data_freq:.1f} Hz), peaks={len(peak_frequencies)}")
 
         # Ищем и отображаем пики, которые есть в текущих данных графика
         for i, peak_freq in enumerate(peak_frequencies[:10]):
             # ПРОВЕРКА: Пик не должен быть дальше максимальной частоты данных
             if peak_freq > max_data_freq * 1.1:  # 10% запас
-                print(f"[DEBUG] Skipping peak {peak_numbers[i] if i < len(peak_numbers) else i+1} at {peak_freq:.1f} Hz (max data freq: {max_data_freq:.1f} Hz)")
                 continue  # Пик вне диапазона данных, пропускаем
 
             # Ищем ближайшее значение частоты в данных графика
