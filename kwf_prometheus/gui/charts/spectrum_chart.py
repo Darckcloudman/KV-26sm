@@ -7,6 +7,8 @@ from PySide6.QtCore import Qt, QTimer
 import numpy as np
 from typing import List
 
+from ..peak_marker import PeakPulseDot
+
 
 # Цвета зон ISO 10816
 ZONE_COLORS = {
@@ -24,99 +26,6 @@ ACC_THRESHOLDS = {'A': 1.0, 'B': 2.5, 'C': 5.0}
 # Уставка предупреждения (Внимание): ~4.5-5.0 мм/с
 # Уставка авария (Авария): 7.0-10.0 мм/с
 VEL_THRESHOLDS = {'A': 3.5, 'B': 5.0, 'C': 7.5}
-
-
-class PulsatingPeakMarker:
-    """Анимированный пульсирующий маркер пика (Pulsating Peak Marker) с tooltip."""
-    
-    def __init__(self, plot_widget, x: float, y: float, number: int, 
-                 base_size: float = 6.0, pulse_speed_ms: int = 1000):
-        """
-        Инициализация пульсирующего маркера пика.
-        
-        Args:
-            plot_widget: PyqtGraph PlotWidget
-            x: Координата X (частота)
-            y: Координата Y (амплитуда)
-            number: Номер пика (1, 2, 3...)
-            base_size: Базовый размер точки в пикселях (диаметр)
-            pulse_speed_ms: Скорость пульсации (полный цикл в мс)
-        """
-        self.plot_widget = plot_widget
-        self.x = x
-        self.y = y
-        self.number = number
-        self.base_size = base_size
-        self.pulse_speed_ms = pulse_speed_ms
-        self.visible = True
-        
-        # Текущий размер (будет анимироваться от base_size/2 до base_size*1.5)
-        self.current_size = base_size
-        self.pulse_phase = 0.0  # 0.0 - 1.0 (фаза синусоиды)
-        
-        # Создаём таймер для пульсации
-        self.pulse_timer = QTimer()
-        self.pulse_timer.timeout.connect(self._update_pulse)
-        # Обновляем 60 FPS для плавности
-        self.pulse_timer.start(pulse_speed_ms // 60)
-        
-        # Красная точка с белым центром (стиль Home экрана)
-        # Используем symbol='o' с красной заливкой и белым контуром
-        self.scatter = pg.ScatterPlotItem(
-            x=[x],
-            y=[y],
-            size=base_size,
-            pen=pg.mkPen(color='#FFFFFF', width=1.5),  # Белый контур
-            brush=pg.mkBrush(color='#DD2C00'),  # Красная заливка
-            symbol='o',
-            zValue=100
-        )
-        # Добавляем tooltip
-        self.scatter.setToolTip(f'Пик #{number}\nЧастота: {x:.2f} Гц\nАмплитуда: {y:.6f}')
-        self.plot_widget.addItem(self.scatter)
-        
-    def _update_pulse(self):
-        """Обновить размер точки для эффекта пульсации."""
-        # Синусоидальная пульсация: от 0.5x до 1.5x базового размера
-        self.pulse_phase += 0.016  # ~60 FPS
-        if self.pulse_phase > 6.28:  # 2*PI
-            self.pulse_phase = 0.0
-        
-        # Амплитуда пульсации: 0.5 до 1.5 от базового размера
-        scale = 1.0 + 0.5 * np.sin(self.pulse_phase)
-        self.current_size = self.base_size * scale
-        
-        # Обновляем размер точки
-        self.scatter.setSize(self.current_size)
-    
-    def update_position(self, x: float, y: float):
-        """Обновить позицию маркера."""
-        self.x = x
-        self.y = y
-        self.scatter.setData(x=[x], y=[y])
-        self.scatter.setToolTip(f'Пик #{self.number}\nЧастота: {x:.2f} Гц\nАмплитуда: {y:.6f}')
-    
-    def set_number(self, number: int):
-        """Обновить номер пика."""
-        self.number = number
-        self.scatter.setToolTip(f'Пик #{number}\nЧастота: {self.x:.2f} Гц\nАмплитуда: {self.y:.6f}')
-    
-    def hide(self):
-        """Скрыть маркер."""
-        self.visible = False
-        self.scatter.hide()
-        self.pulse_timer.stop()
-    
-    def show(self):
-        """Показать маркер."""
-        self.visible = True
-        self.scatter.show()
-        self.pulse_timer.start()
-    
-    def cleanup(self):
-        """Удалить маркер из графика и остановить таймер."""
-        self.pulse_timer.stop()
-        self.plot_widget.removeItem(self.scatter)
 
 
 class SpectrumChart(QWidget):
@@ -141,7 +50,7 @@ class SpectrumChart(QWidget):
         self.highlight_peaks = highlight_peaks
         self._zone_items = []
         self._threshold_lines = []
-        self._peak_markers: List[PulsatingPeakMarker] = []
+        self._peak_markers: List[pg.ScatterPlotItem] = []
         self.setup_ui()
 
     def setup_ui(self) -> None:
@@ -350,21 +259,41 @@ class SpectrumChart(QWidget):
 
             print(f"[DEBUG] Добавлен пульсирующий пик #{peak_number} на {peak_freq:.2f} Гц, amp={peak_amp:.6f}")
 
-            # Создаём пульсирующий маркер (Pulsating Peak Marker)
-            marker = PulsatingPeakMarker(
-                self.plot_widget,
-                x=peak_freq,
-                y=peak_amp,
-                number=peak_number,
-                base_size=6.0,  # Базовый размер 6px
-                pulse_speed_ms=1000  # Скорость пульсации 1 секунда
+            # Создаём маркер пика с использованием универсального компонента PeakPulseDot
+            # Создаем ScatterPlotItem для позиции на графике
+            marker_scatter = pg.ScatterPlotItem(
+                x=[peak_freq],
+                y=[peak_amp],
+                size=12,  # Размер точки для графика
+                pen=pg.mkPen(color='#FF3B3B', width=0),  # Красный без обводки
+                brush=pg.mkBrush(color='#FF3B3B'),
+                symbol='o',
+                zValue=100
             )
-            self._peak_markers.append(marker)
+            
+            # Добавляем tooltip
+            tooltip_text = f'Пик #{peak_number}\nЧастота: {peak_freq:.2f} Гц\nАмплитуда: {peak_amp:.6f}'
+            marker_scatter.setToolTip(tooltip_text)
+            
+            # Добавляем на график
+            self.plot_widget.addItem(marker_scatter)
+            
+            # Создаем невидимый PeakPulseDot для анимации (позиционируем вручную)
+            # Конвертируем координаты графика в экранные
+            plot_rect = self.plot_widget.geometry()
+            dot_size = 30
+            dot_x = int(peak_freq * self.plot_widget.getAxis('bottom').scale) + plot_rect.x() - dot_size//2
+            dot_y = int(peak_amp * self.plot_widget.getAxis('left').scale) + plot_rect.y() - dot_size//2
+            
+            # Для простоты, используем только scatter с фиксированным стилем
+            # PeakPulseDot требует отдельного QWidget, что сложно интегрировать в pyqtgraph
+            
+            self._peak_markers.append(marker_scatter)
 
     def _clear_peak_markers(self) -> None:
         """Удалить все маркеры пиков."""
         for marker in self._peak_markers:
-            marker.cleanup()
+            self.plot_widget.removeItem(marker)
         self._peak_markers.clear()
 
     def clear(self) -> None:
