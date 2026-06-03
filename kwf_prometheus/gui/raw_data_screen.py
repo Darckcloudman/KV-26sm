@@ -246,7 +246,7 @@ class RawDataCanvas(QWidget):
 
 
 class SensorSelector(QFrame):
-    """Панель выбора датчика с 8 кнопками."""
+    """Панель выбора датчика с 8 кнопками (разделены на группы)."""
     
     sensor_selected = Signal(int)  # Сигнал выбора датчика
     
@@ -261,21 +261,28 @@ class SensorSelector(QFrame):
         """)
         self.selected_sensor = 1
         
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 6, 8, 6)
+        main_layout.setSpacing(4)
+        
+        # Группа 1: Редуктор (датчики 1-5)
+        gearbox_layout = QHBoxLayout()
+        gearbox_layout.setSpacing(4)
+        gearbox_label = QLabel('Редуктор:')
+        gearbox_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 9px; font-weight: bold;")
+        gearbox_layout.addWidget(gearbox_label)
         
         self.buttons = {}
-        for sensor_id in range(1, 9):
+        for sensor_id in range(1, 6):
             btn = QPushButton(str(sensor_id))
-            btn.setFixedSize(36, 36)
+            btn.setFixedSize(32, 32)
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLOR_BG_SECONDARY};
                     color: {COLOR_TEXT_SECONDARY};
                     border: 1px solid {COLOR_BORDER};
                     border-radius: 4px;
-                    font-size: 14px;
+                    font-size: 13px;
                     font-weight: bold;
                 }}
                 QPushButton:hover {{
@@ -290,8 +297,46 @@ class SensorSelector(QFrame):
             """)
             btn.setCheckable(True)
             btn.clicked.connect(lambda checked, sid=sensor_id: self._on_sensor_clicked(sid))
-            layout.addWidget(btn)
+            gearbox_layout.addWidget(btn)
             self.buttons[sensor_id] = btn
+        
+        main_layout.addLayout(gearbox_layout)
+        
+        # Группа 2: Генератор (датчики 6-8)
+        generator_layout = QHBoxLayout()
+        generator_layout.setSpacing(4)
+        generator_label = QLabel('Генератор:')
+        generator_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 9px; font-weight: bold;")
+        generator_layout.addWidget(generator_label)
+        
+        for sensor_id in range(6, 9):
+            btn = QPushButton(str(sensor_id))
+            btn.setFixedSize(32, 32)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLOR_BG_SECONDARY};
+                    color: {COLOR_TEXT_SECONDARY};
+                    border: 1px solid {COLOR_BORDER};
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLOR_BG_TERTIARY};
+                    color: {COLOR_TEXT_PRIMARY};
+                }}
+                QPushButton:checked {{
+                    background-color: {COLOR_ACCENT};
+                    color: {COLOR_BG_PRIMARY};
+                    border: 1px solid {COLOR_ACCENT};
+                }}
+            """)
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked, sid=sensor_id: self._on_sensor_clicked(sid))
+            generator_layout.addWidget(btn)
+            self.buttons[sensor_id] = btn
+        
+        main_layout.addLayout(generator_layout)
         
         # Выделяем первый датчик
         self.buttons[1].setChecked(True)

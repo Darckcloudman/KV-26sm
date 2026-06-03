@@ -714,23 +714,57 @@ class HomeScreen(QWidget):
         status_layout.setColumnStretch(2, 0)
 
         self.status_labels = {}
-        for i, desc in enumerate(SENSOR_DESCRIPTIONS):
+        row = 0
+        
+        # Заголовок группы: Редуктор (датчики 1-5)
+        gearbox_header = QLabel('РЕДУКТОР')
+        gearbox_header.setStyleSheet("color: #888888; font-size: 10px; font-weight: bold; background: transparent;")
+        status_layout.addWidget(gearbox_header, row, 0, 1, 3, alignment=Qt.AlignmentFlag.AlignTop)
+        row += 1
+        
+        for i, desc in enumerate(SENSOR_DESCRIPTIONS[:5]):  # Датчики 1-5
             sensor_id = i + 1
 
             num_label = QLabel(f"{sensor_id}.")
             num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
-            status_layout.addWidget(num_label, i, 0, alignment=Qt.AlignmentFlag.AlignTop)
+            status_layout.addWidget(num_label, row, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
             desc_label = QLabel(desc)
             desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
-            status_layout.addWidget(desc_label, i, 1, alignment=Qt.AlignmentFlag.AlignTop)
+            status_layout.addWidget(desc_label, row, 1, alignment=Qt.AlignmentFlag.AlignTop)
 
             status_label = QLabel("[нет данных]")
             status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
             status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignmentFlag.AlignTop)
+            status_layout.addWidget(status_label, row, 2, alignment=Qt.AlignmentFlag.AlignTop)
 
             self.status_labels[sensor_id] = status_label
+            row += 1
+
+        # Заголовок группы: Генератор (датчики 6-8)
+        generator_header = QLabel('ГЕНЕРАТОР')
+        generator_header.setStyleSheet("color: #888888; font-size: 10px; font-weight: bold; background: transparent;")
+        status_layout.addWidget(generator_header, row, 0, 1, 3, alignment=Qt.AlignmentFlag.AlignTop)
+        row += 1
+        
+        for i, desc in enumerate(SENSOR_DESCRIPTIONS[5:8]):  # Датчики 6-8
+            sensor_id = i + 6
+
+            num_label = QLabel(f"{sensor_id}.")
+            num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
+            status_layout.addWidget(num_label, row, 0, alignment=Qt.AlignmentFlag.AlignTop)
+
+            desc_label = QLabel(desc)
+            desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
+            status_layout.addWidget(desc_label, row, 1, alignment=Qt.AlignmentFlag.AlignTop)
+
+            status_label = QLabel("[нет данных]")
+            status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
+            status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            status_layout.addWidget(status_label, row, 2, alignment=Qt.AlignmentFlag.AlignTop)
+
+            self.status_labels[sensor_id] = status_label
+            row += 1
 
         status_frame.setMaximumWidth(650)
         status_wrapper.addWidget(status_frame)
