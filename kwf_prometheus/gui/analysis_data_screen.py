@@ -447,10 +447,25 @@ class AnalysisDataScreen(QWidget):
         """Устаревший метод — больше не используется (combo box удалён)."""
         pass
 
-    def _find_top_peaks(self, freqs, amps, top_n=10):
-        """Найти ТОП-N пиков в спектре."""
+    def _find_top_peaks(self, freqs, amps, top_n=10, max_freq_limit=None):
+        """Найти ТОП-N пиков в спектре.
+        
+        Args:
+            freqs: массив частот
+            amps: массив амплитуд
+            top_n: количество пиков
+            max_freq_limit: максимальная частота (Nyquist limit)
+        """
         if len(amps) == 0:
             return []
+
+        # Фильтруем по максимальной частоте (теорема Найквиста)
+        if max_freq_limit is not None:
+            mask = freqs <= max_freq_limit
+            freqs = freqs[mask]
+            amps = amps[mask]
+            if len(amps) == 0:
+                return []
 
         # Для малых массивов (< 50 точек) используем простую сортировку по амплитуде
         if len(amps) < 50:
@@ -485,20 +500,31 @@ class AnalysisDataScreen(QWidget):
         analyzer = VibrationAnalyzer()
         all_peaks = []
 
-        # Собираем пики из всех трёх спектров
+        # Собираем пики из всех трёх спектров с диапазонами частот
         signal_configs = [
-            ('НЧ', 'acceleration', 'acceleration_fs', 'м/с²', ACC_THRESHOLDS),
-            ('ВЧ', 'velocity', 'velocity_fs', 'мм/с', VEL_THRESHOLDS),
-            ('ВЧ(ф)', 'high_freq', 'high_freq_fs', 'м/с²', ACC_THRESHOLDS),
+            # (название, ключ данных, ключ Fs, единицы, пороги, min_freq, max_freq)
+            ('НЧ', 'acceleration', 'acceleration_fs', 'м/с²', ACC_THRESHOLDS, 0.1, 10),
+            ('ВЧ', 'velocity', 'velocity_fs', 'мм/с', VEL_THRESHOLDS, 10, 1000),
+            ('ВЧ(ф)', 'high_freq', 'high_freq_fs', 'м/с²', ACC_THRESHOLDS, 0, 12000),
         ]
         
-        for signal_name, signal_key, fs_key, unit, thresholds in signal_configs:
+        for signal_name, signal_key, fs_key, unit, thresholds, min_f, max_f in signal_configs:
             signal_data = data.get(signal_key)
             fs = data.get(fs_key)
             
             if signal_data is not None and fs and len(signal_data) > 0:
                 freqs, amps = analyzer.calculate_spectrum(np.array(signal_data), fs)
-                peaks = self._find_top_peaks(freqs, amps, top_n=5)
+                # Ограничиваем пики по диапазону фильтра + Найквисту
+                nyquist_freq = fs / 2
+                effective_max = min(max_f, nyquist_freq)
+                peaks = self._find_top_peaks(freqs, amps, top_n=5, max_freq_limit=effective_max)
+                
+                # Дополнительный фильтр по минимальной частоте
+                peaks = [p for p in peaks if p['frequency'] >= min_f]
+                
+                print(f"[DEBUG] {signal_name}: Fs={fs:.0f} Hz, Nyquist={nyquist_freq:.0f} Hz, range={min_f}-{effective_max:.0f} Hz, found {len(peaks)} peaks")
+                for p in peaks[:3]:
+                    print(f"[DEBUG]   - {p['frequency']:.2f} Hz, amp={p['amplitude']:.6f}")
                 
                 for peak in peaks:
                     zone = '-'
@@ -508,11 +534,12 @@ class AnalysisDataScreen(QWidget):
                         zone = analyzer.determine_zone_vel(peak['amplitude'])
 
                     all_peaks.append({
-                        'signal_type': signal_name,
+                        'signal_type': signal_name,  # НЧ, ВЧ, или ВЧ(ф)
                         'frequency': peak['frequency'],
                         'amplitude': peak['amplitude'],
                         'zone': zone,
-                        'unit': unit
+                        'unit': unit,
+                        'freq_range': (min_f, max_f)  # Диапазон фильтра
                     })
 
         # Сортируем все пики по амплитуде
@@ -529,25 +556,9 @@ class AnalysisDataScreen(QWidget):
             item0.setForeground(QColor(COLOR_TEXT_PRIMARY))
             self.harmonics_table.setItem(row_idx, 0, item0)
 
-            # Тип сигнала определяем по комбинации ЕДИНИЦ и ЧАСТОТЫ
-            # НЧ (0.1-10 Гц): ускорение, м/с²
-            # ВЧ (10-1000 Гц): скорость, мм/с
-            # ВЧ(ф) (0-12 кГц): ускорение ВЧ, м/с²
-            freq = peak['frequency']
-            unit = peak.get('unit', '')
-            
-            if unit == 'мм/с':
-                # Скорость = ВЧ спектр (10-1000 Гц)
-                signal_type_display = 'ВЧ'
-            elif freq < 10:
-                # Ускорение < 10 Гц = НЧ спектр
-                signal_type_display = 'НЧ'
-            else:
-                # Ускорение ≥ 10 Гц = ВЧ(ф) спектр
-                signal_type_display = 'ВЧ(ф)'
-            
-            # Сохраняем для отображения на соответствующем графике
-            peak['signal_type'] = signal_type_display
+            # Тип сигнала уже определён из signal_configs и сохранён в signal_type
+            # Используем его напрямую
+            signal_type_display = peak['signal_type']
 
             item1 = QTableWidgetItem(signal_type_display)
             item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -667,30 +678,32 @@ class AnalysisDataScreen(QWidget):
         # ВЧ(ф) спектр (0-12 кГц)
         if data.get('high_freq') is not None and data.get('high_freq_fs'):
             hf = np.array(data['high_freq'])
-            fs = data['high_freq_fs']
+            fs = data.get('high_freq_fs')
             if len(hf) > 0 and fs > 0:
                 freqs, amps = analyzer.calculate_spectrum(hf, fs)
-                mask = (freqs >= 0) & (freqs <= 12000)
+                # Nyquist limit
+                nyquist = fs / 2
+                mask = (freqs >= 0) & (freqs <= nyquist)
                 freq_masked = freqs[mask]
                 amps_masked = amps[mask]
                 # Сохраняем данные для последующего отображения пика
                 self._spec_hf_freq = freq_masked
                 self._spec_hf_amps = amps_masked
-                # Устанавливаем диапазон графика с запасом 20% для отображения пиков
+                # Устанавливаем диапазон графика с запасом 5%
                 if len(freq_masked) > 0:
                     max_freq = np.max(freq_masked)
-                    # Для ВЧ(ф) графика всегда показываем до 12 кГц (или до max_freq)
-                    x_max = max(max_freq * 1.2, 12000)
+                    # Показываем до max частоты данных + 5%
+                    x_max = max_freq * 1.05
                     self.spec_hf_chart.plot_widget.setXRange(0, x_max, padding=0.05)
-                    print(f"[UPDATE] ВЧ(ф) спектр: {len(freq_masked)} точек, диапазон {np.min(freq_masked):.2f}-{max_freq:.2f} Hz, Fs={fs:.0f} Hz, X_max={x_max:.0f} Hz")
+                    print(f"[UPDATE] VCh(f) spektr: {len(freq_masked)} tochek, diapazon {np.min(freq_masked):.2f}-{max_freq:.2f} Hz, Fs={fs:.0f} Hz, Nyquist={nyquist:.0f} Hz, X_max={x_max:.0f} Hz")
                 else:
-                    print(f"[UPDATE] ВЧ(ф): пустой спектр после фильтрации")
+                    print(f"[UPDATE] VCh(f): pustoy spektr posle filtratsii")
                 self.spec_hf_chart.set_data(freq_masked, amps_masked)
             else:
-                print(f"[UPDATE] ВЧ(ф): нет данных (hf={len(hf) if 'hf' in dir() else 0}, fs={fs})")
+                print(f"[UPDATE] VCh(f): net dannyh (hf={len(hf) if 'hf' in dir() else 0}, fs={fs})")
                 self.spec_hf_chart.clear()
         else:
-            print(f"[UPDATE] ВЧ(ф): high_freq или high_freq_fs отсутствует")
+            print(f"[UPDATE] VCh(f): high_freq ili high_freq_fs otsutstvuet")
             self.spec_hf_chart.clear()
 
     def _on_harmonics_row_selected(self):
@@ -754,13 +767,15 @@ class AnalysisDataScreen(QWidget):
         # Проверяем ВЧ(ф) график (0-12000 Гц)
         if target_chart is None and hf_freq is not None and len(hf_freq) > 0:
             hf_min, hf_max = np.min(hf_freq), np.max(hf_freq)
-            # Для ВЧ(ф) графика всегда разрешаем пики до 12000 Гц
-            max_allowed = max(hf_max * 1.3, 12000)
-            if hf_min * 0.9 <= peak_freq <= max_allowed:
+            # Пик должен быть в диапазоне данных (с запасом 10%)
+            # НЕ показываем пик если частота выше максимума данных
+            if hf_min * 0.9 <= peak_freq <= hf_max * 1.1:
                 target_chart = self.spec_hf_chart
                 freq_data = hf_freq
                 amp_data = getattr(self, '_spec_hf_amps', None)
-                print(f"[DEBUG] Пик {peak_freq:.2f} Hz -> ВЧ(ф) график (диапазон {hf_min:.2f}-{hf_max:.2f}, max_allowed={max_allowed:.0f})")
+                print(f"[DEBUG] Pik {peak_freq:.2f} Hz -> VCh(f) grafik (diapazon {hf_min:.2f}-{hf_max:.2f})")
+            else:
+                print(f"[DEBUG] Pik {peak_freq:.2f} Hz NE POPADAET v diapazon VCh(f) (max={hf_max:.2f})!")
         
         # Показываем пик на найденном графике
         if target_chart is not None:

@@ -320,13 +320,8 @@ class SpectrumChart(QWidget):
             max_data_freq = np.max(freq_data)
             min_data_freq = np.min(freq_data)
             
-            # ПРОВЕРКА: Пик должен быть в диапазоне данных графика
-            # Для ВЧ(ф) графика (max > 1000 Гц) допускаем пики до 12000 Гц
-            is_hf_chart = max_data_freq > 1000
-            if is_hf_chart:
-                max_allowed = 12000  # Всегда разрешаем до 12 кГц для ВЧ(ф)
-            else:
-                max_allowed = max_data_freq * 1.2
+            # ПРОВЕРКА: Пик должен быть в диапазоне данных графика (с запасом 10%)
+            max_allowed = max_data_freq * 1.1
             
             if peak_freq < min_data_freq * 0.9 or peak_freq > max_allowed:
                 print(f"[DEBUG] Pik {peak_freq} Hz vne diapazona (max={max_data_freq:.2f}, allowed={max_allowed:.0f})!")
