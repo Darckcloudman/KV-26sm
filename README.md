@@ -163,6 +163,16 @@ app/
 
 ## 📄 Документация
 
+### Основная документация
 - [DAL_GUIDE.md](DAL_GUIDE.md) - полное руководство по DAL
 - [GETTING_STARTED.md](GETTING_STARTED.md) - быстрый старт
-- [DEVELOPMENT_GUIDELINES.md](DEVELOPMENT_GUIDELINES.md) - руководство разработчика (стили, иконки, архитектура)
+- [DEVELOPMENT_GUIDELINES.md](DEVELOPMENT_GUIDELINES.md) - руководство разработчика
+
+### Технические документы
+- **[NYQUIST_FFT_THEORY.md](kwf_prometheus/docs/NYQUIST_FFT_THEORY.md)** — теорема Найквиста и FFT в вибродиагностике
+- [FORMAT_ANALYSIS.md](FORMAT_ANALYSIS.md) - анализ формата файлов .rd2/.rw2
+- [SG132_THRESHOLDS.md](SG132_THRESHOLDS.md) - пороги вибрации для SG 5.8-158
+
+### История изменений
+- [CHANGELOG_v1.3.md](CHANGELOG_v1.3.md) - история изменений v1.3
+- [BUGFIX_*.md](BUGFIX_*.md) - отчёты об исправлениях
