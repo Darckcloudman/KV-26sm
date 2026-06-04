@@ -137,6 +137,11 @@ class PDFReportGenerator:
         self.data = parser.get_sensor_data(sensor_id) if parser else None
         self.metrics = parser.get_turbine_metrics() if parser else {}
 
+        # Получаем дату записи из данных парсера (если доступна)
+        self.record_date = None
+        if parser and hasattr(parser, 'metadata') and parser.metadata:
+            self.record_date = parser.metadata.get('record_date')
+
         # Цвета (чёрно-белая тема) — лениво, только при наличии reportlab
         if HAS_REPORTLAB:
             self.COLOR_BLACK = colors.HexColor('#000000')
@@ -218,6 +223,22 @@ class PDFReportGenerator:
 
             # === Заголовок ===
             story.append(Paragraph("Отчёт по вибродиагностике ВЭУ", title_style))
+            
+            # Добавляем информацию о турбине и дате записи
+            turbine_id = self.metrics.get('turbine_id', 'Не указано')
+            if self.record_date:
+                try:
+                    if isinstance(self.record_date, datetime):
+                        date_str = self.record_date.strftime('%d.%m.%Y %H:%M')
+                    else:
+                        date_str = str(self.record_date)
+                except Exception:
+                    date_str = str(self.record_date)
+            else:
+                date_str = "Дата записи не указана"
+            
+            header_info = f"Турбина: {turbine_id} | Дата записи: {date_str}"
+            story.append(Paragraph(header_info, normal_style))
             story.append(Spacer(1, 4*mm))
 
             # === Информация о турбине ===
@@ -262,8 +283,10 @@ class PDFReportGenerator:
 
     def _create_turbine_table(self) -> Table:
         """Создать таблицу параметров турбины."""
+        turbine_id = self.metrics.get('turbine_id', 'Не указано')
         data = [
             ['Параметр', 'Значение', 'Единица'],
+            ['ID турбины', str(turbine_id), '-'],
             ['Мощность', f"{self.metrics.get('power_kw', 0):.1f}", 'кВт'],
             ['Частота вращения', f"{self.metrics.get('generator_speed_rpm', 0):.1f}", 'об/мин'],
             ['Скорость ветра', f"{self.metrics.get('wind_speed_ms', 0):.1f}", 'м/с'],
