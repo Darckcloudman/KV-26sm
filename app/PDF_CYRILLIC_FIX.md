@@ -16,17 +16,22 @@
 
 ```python
 # НАСТРОЙКА КИРИЛЛИЦЫ ДЛЯ MATPLOTLIB
-import matplotlib
+import matplotlib  # type: ignore[import-not-found]
 matplotlib.use('Agg')
 
 # Настройка шрифтов для поддержки кириллицы
 matplotlib.rcParams['font.family'] = 'DejaVu Sans'
 matplotlib.rcParams['axes.unicode_minus'] = False  # Корректное отображение минуса
 
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # type: ignore[import-not-found]
 
-# При сохранении указываем кодировку
-fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
+# Использование в графиках
+fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
+ax.set_xlabel('Время, с', fontsize=10)
+ax.set_ylabel('Ускорение, м/с²', fontsize=10)
+fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
+
+fig.savefig(temp_path, bbox_inches='tight', dpi=100)
 ```
 
 ### 2. reportlab (файл `pdf_generator.py`)
@@ -34,11 +39,13 @@ fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
 ```python
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.cidfonts import UnicodeFont, IdentityH
+
+CYRILLIC_FONT_NAME = None
 
 def _setup_cyrillic_fonts():
-    """Настроить шрифты с поддержкой кириллицы."""
-    # Попытка зарегистрировать DejaVu Sans
+    """Настроить шрифты с поддержкой кириллицы через TTFont."""
+    global CYRILLIC_FONT_NAME
+    
     font_paths = [
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
         'C:/Windows/Fonts/DejaVuSans.ttf',
@@ -48,15 +55,16 @@ def _setup_cyrillic_fonts():
     for font_path in font_paths:
         if os.path.exists(font_path):
             pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+            CYRILLIC_FONT_NAME = 'DejaVuSans'
             return 'DejaVuSans'
     
-    # Fallback: Unicode шрифт
-    unicode_font = UnicodeFont('Unicode', IdentityH())
-    pdfmetrics.registerFont(unicode_font)
-    return 'Unicode'
+    # Fallback: Helvetica
+    CYRILLIC_FONT_NAME = 'Helvetica'
+    return 'Helvetica'
 
 # Глобальная инициализация
-CYRILLIC_FONT_NAME = _setup_cyrillic_fonts()
+if HAS_REPORTLAB:
+    _setup_cyrillic_fonts()
 
 # Использование в стилях
 font_name = CYRILLIC_FONT_NAME or 'Helvetica'
@@ -175,6 +183,7 @@ matplotlib.rcParams['font.family'] = 'DejaVu Sans'
 |--------|------|-----------|
 | 1.4.1 | 2026 | Добавлена поддержка кириллицы в PDF |
 | 1.4.2 | 2026 | Улучшена обработка отсутствующих шрифтов |
+| 1.4.3 | 2026 | Исправлены ошибки type checking: <br>• Удалены UnicodeFont, IdentityH, _fontdata <br>• Добавлены type ignore для matplotlib <br>• Упрощена регистрация шрифтов (только TTFont) |
 
 ## Контакты
 
