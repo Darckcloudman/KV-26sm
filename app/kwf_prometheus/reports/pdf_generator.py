@@ -142,6 +142,12 @@ class PDFReportGenerator:
         if parser and hasattr(parser, 'metadata') and parser.metadata:
             self.record_date = parser.metadata.get('record_date')
 
+        # Группы датчиков
+        self.sensor_groups = {
+            'Редуктор': [1, 2, 3, 4],
+            'Генератор': [5, 6, 7, 8]
+        }
+
         # Цвета (чёрно-белая тема) — лениво, только при наличии reportlab
         if HAS_REPORTLAB:
             self.COLOR_BLACK = colors.HexColor('#000000')
@@ -251,9 +257,17 @@ class PDFReportGenerator:
             story.append(self._create_sensors_table())
             story.append(Spacer(1, 6*mm))
 
+            # === Топ-10 пиков для выбранного датчика ===
+            story.append(Paragraph("3. Топ-10 пиков вибрации", heading_style))
+            story.append(self._create_peaks_table())
+            story.append(Spacer(1, 10*mm))
+
+            # Перенос на новую страницу
+            story.append(PageBreak())
+
             # === Графики ===
             if chart_images:
-                story.append(Paragraph("3. Графики вибрации", heading_style))
+                story.append(Paragraph("4. Графики вибрации", heading_style))
                 for name, img_path in chart_images.items():
                     if Path(img_path).exists():
                         story.append(Paragraph(f"<b>{name}</b>", normal_style))
@@ -269,7 +283,7 @@ class PDFReportGenerator:
 
             # === Подвал ===
             story.append(Paragraph(
-                f"KWF Prometheus v1.4.1 | Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')} | A.Telezhenko, 2026",
+                f"KWF Prometheus v1.4.2 | {datetime.now().strftime('%d.%m.%Y %H:%M')}",
                 info_style
             ))
 
@@ -295,57 +309,140 @@ class PDFReportGenerator:
         return self._styled_table(data, col_widths=[60*mm, 40*mm, 30*mm])
 
     def _create_sensors_table(self) -> Table:
-        """Создать таблицу состояния датчиков."""
+        """Создать таблицу состояния датчиков с группировкой."""
         from ..utils.vibration_analysis import VibrationAnalyzer
         analyzer = VibrationAnalyzer()
 
-        data = [['Датчик', 'НЧ RMS', 'ВЧ RMS', 'ВЧ(ф) RMS', 'Зона']]
+        # Создаём таблицу с группировкой
+        data = [['Группа', 'Датчик', 'НЧ RMS', 'ВЧ RMS', 'ВЧ(ф) RMS', 'Зона']]
 
-        for sid in range(1, 9):
-            sensor_data = self.parser.get_sensor_data(sid)
-            if sensor_data is None:
-                data.append([f'Датчик {sid}', '—', '—', '—', 'Нет данных'])
-                continue
+        for group_name, sensor_ids in self.sensor_groups.items():
+            for sid in sensor_ids:
+                sensor_data = self.parser.get_sensor_data(sid)
+                if sensor_data is None:
+                    data.append([group_name, f'Датчик {sid}', '—', '—', '—', 'Нет данных'])
+                    continue
 
-            rms_values = []
-            zones = []
+                rms_values = []
+                zones = []
 
-            for signal_key in ['acceleration', 'velocity', 'high_freq']:
-                signal = sensor_data.get(signal_key)
-                if signal is not None:
-                    rms = np.sqrt(np.mean(np.array(signal) ** 2))
-                    rms_values.append(f"{rms:.4f}")
-                    if signal_key == 'velocity':
-                        zones.append(analyzer.determine_zone_vel(rms))
+                for signal_key in ['acceleration', 'velocity', 'high_freq']:
+                    signal = sensor_data.get(signal_key)
+                    if signal is not None:
+                        rms = np.sqrt(np.mean(np.array(signal) ** 2))
+                        rms_values.append(f"{rms:.4f}")
+                        if signal_key == 'velocity':
+                            zones.append(analyzer.determine_zone_vel(rms))
+                        else:
+                            zones.append(analyzer.determine_zone_acc(rms))
                     else:
-                        zones.append(analyzer.determine_zone_acc(rms))
-                else:
-                    rms_values.append('—')
-                    zones.append('—')
+                        rms_values.append('—')
+                        zones.append('—')
 
-            # Определяем общую зону (максимальная)
-            zone_priorities = {'D': 4, 'C': 3, 'B': 2, 'A': 1, '-': 0, '—': 0}
-            max_zone = max(zones, key=lambda z: zone_priorities.get(z, 0)) if zones else '—'
+                # Определяем общую зону (максимальная)
+                zone_priorities = {'D': 4, 'C': 3, 'B': 2, 'A': 1, '-': 0, '—': 0}
+                max_zone = max(zones, key=lambda z: zone_priorities.get(z, 0)) if zones else '—'
 
-            data.append([f'Датчик {sid}'] + rms_values + [max_zone])
+                data.append([group_name, f'Датчик {sid}'] + rms_values + [max_zone])
 
-        return self._styled_table(data, col_widths=[30*mm, 30*mm, 30*mm, 30*mm, 25*mm])
+            # Добавляем пустую строку между группами (опционально)
+            # data.append(['', '', '', '', '', ''])
+
+        return self._styled_table_sensors(data, col_widths=[20*mm, 20*mm, 25*mm, 25*mm, 25*mm, 20*mm])
+
+    def _create_peaks_table(self) -> Table:
+        """Создать таблицу топ-10 пиков вибрации для выбранного датчика."""
+        from ..utils.vibration_analysis import VibrationAnalyzer
+        analyzer = VibrationAnalyzer()
+
+        sensor_data = self.parser.get_sensor_data(self.sensor_id)
+        if sensor_data is None:
+            return self._styled_table(
+                [['Пик', 'Частота', 'Амплитуда', 'Тип']],
+                col_widths=[30*mm, 40*mm, 40*mm, 30*mm]
+            )
+
+        # Собираем все пики из всех сигналов
+        all_peaks = []
+
+        # НЧ (ускорение)
+        if sensor_data.get('acceleration') is not None and sensor_data.get('acceleration_fs'):
+            acc = np.array(sensor_data['acceleration'])
+            fs = sensor_data['acceleration_fs']
+            freqs, amps = analyzer.calculate_spectrum(acc, fs)
+            
+            # Находим пики в диапазоне 0-1000 Гц
+            for i in range(1, len(freqs) - 1):
+                if amps[i] > amps[i-1] and amps[i] > amps[i+1] and freqs[i] <= 1000:
+                    all_peaks.append({
+                        'freq': freqs[i],
+                        'amp': amps[i],
+                        'type': 'НЧ (ускорение)'
+                    })
+
+        # ВЧ (скорость)
+        if sensor_data.get('velocity') is not None and sensor_data.get('velocity_fs'):
+            vel = np.array(sensor_data['velocity'])
+            fs = sensor_data['velocity_fs']
+            freqs, amps = analyzer.calculate_spectrum(vel, fs)
+            
+            for i in range(1, len(freqs) - 1):
+                if amps[i] > amps[i-1] and amps[i] > amps[i+1] and freqs[i] <= 1000:
+                    all_peaks.append({
+                        'freq': freqs[i],
+                        'amp': amps[i],
+                        'type': 'ВЧ (скорость)'
+                    })
+
+        # ВЧ(ф) (высокочастотное ускорение)
+        if sensor_data.get('high_freq') is not None and sensor_data.get('high_freq_fs'):
+            hf = np.array(sensor_data['high_freq'])
+            fs = sensor_data['high_freq_fs']
+            freqs, amps = analyzer.calculate_spectrum(hf, fs)
+            
+            for i in range(1, len(freqs) - 1):
+                if amps[i] > amps[i-1] and amps[i] > amps[i+1] and freqs[i] <= 1000:
+                    all_peaks.append({
+                        'freq': freqs[i],
+                        'amp': amps[i],
+                        'type': 'ВЧ(ф)'
+                    })
+
+        # Сортируем по амплитуде (по убыванию)
+        all_peaks.sort(key=lambda x: x['amp'], reverse=True)
+        
+        # Берем топ-10
+        top_peaks = all_peaks[:10]
+
+        # Создаем таблицу
+        data = [['#', 'Частота, Гц', 'Амплитуда', 'Тип']]
+        for idx, peak in enumerate(top_peaks, 1):
+            data.append([
+                str(idx),
+                f"{peak['freq']:.2f}",
+                f"{peak['amp']:.4f}",
+                peak['type']
+            ])
+
+        return self._styled_table(data, col_widths=[15*mm, 40*mm, 40*mm, 40*mm])
 
     def _generate_conclusion(self) -> str:
         """Сгенерировать текст заключения на основе зон."""
         from ..utils.vibration_analysis import VibrationAnalyzer
         analyzer = VibrationAnalyzer()
 
-        max_priority = 0
-        worst_sensor = None
-        worst_zone = 'A'
+        # Собираем все датчики с их зонами
+        sensor_zones = {}
+        zone_priorities = {'D': 4, 'C': 3, 'B': 2, 'A': 1, '-': 0, '—': 0}
         zone_names = {'A': 'Норма', 'B': 'Внимание', 'C': 'Требует внимания', 'D': 'Критично'}
-        zone_priorities = {'D': 4, 'C': 3, 'B': 2, 'A': 1, '-': 0}
 
         for sid in range(1, 9):
             sensor_data = self.parser.get_sensor_data(sid)
             if sensor_data is None:
                 continue
+
+            max_zone = 'A'
+            max_priority = 0
 
             for signal_key in ['acceleration', 'velocity', 'high_freq']:
                 signal = sensor_data.get(signal_key)
@@ -359,19 +456,49 @@ class PDFReportGenerator:
                     priority = zone_priorities.get(zone, 0)
                     if priority > max_priority:
                         max_priority = priority
-                        worst_sensor = sid
-                        worst_zone = zone
+                        max_zone = zone
 
-        if max_priority == 0:
+            if max_priority > 0:
+                sensor_zones[sid] = {'zone': max_zone, 'priority': max_priority}
+
+        if not sensor_zones:
             return "Все датчики в норме. Значения вибрации соответствуют зоне A (нормальное состояние). Рекомендуется продолжать регулярный мониторинг."
-        elif worst_zone == 'A':
-            return f"Состояние турбины в норме. Максимальная зона — A (нормальное состояние). Рекомендуется продолжать регулярный мониторинг."
+
+        # Сортируем по приоритету (от худшего к лучшему)
+        sorted_sensors = sorted(sensor_zones.items(), key=lambda x: x[1]['priority'], reverse=True)
+        worst_priority = sorted_sensors[0][1]['priority']
+        worst_zone = sorted_sensors[0][1]['zone']
+
+        # Находим все датчики в худшей зоне
+        worst_zone_sensors = [sid for sid, data in sorted_sensors if data['priority'] == worst_priority]
+
+        # Формируем текст заключения
+        if worst_zone == 'A':
+            return "Состояние турбины в норме. Все датчики показывают значения в зоне A (нормальное состояние). Рекомендуется продолжать регулярный мониторинг."
         elif worst_zone == 'B':
-            return f"Требуется внимание. Датчик {worst_sensor} показывает значения в зоне B. Рекомендуется увеличить частоту проверок и рассмотреть плановое техническое обслуживание."
+            sensor_list = ', '.join([f'Датчик {sid}' for sid in worst_zone_sensors])
+            return f"Требуется внимание. {sensor_list} показывают значения в зоне B ({zone_names[worst_zone]}). Рекомендуется увеличить частоту проверок и рассмотреть плановое техническое обслуживание."
         elif worst_zone == 'C':
-            return f"Требуется вмешательство. Датчик {worst_sensor} показывает значения в зоне C. Необходимо провести детальную диагностику и запланировать ремонтные работы."
-        else:
-            return f"КРИТИЧНО! Датчик {worst_sensor} показывает значения в зоне D. Требуется немедленная остановка оборудования и проведение аварийного ремонта."
+            sensor_list = ', '.join([f'Датчик {sid}' for sid in worst_zone_sensors])
+            other_sensors = [sid for sid, data in sorted_sensors if data['priority'] < worst_priority and data['priority'] >= 2]
+            if other_sensors:
+                other_list = ', '.join([f'Датчик {sid}' for sid in other_sensors])
+                return f"Требуется вмешательство. {sensor_list} показывают наихудшие значения в зоне C ({zone_names[worst_zone]}). {other_list} также показывают значения в зоне C и требуют проверки. Необходимо провести детальную диагностику и запланировать ремонтные работы."
+            else:
+                return f"Требуется вмешательство. {sensor_list} показывают значения в зоне C ({zone_names[worst_zone]}). Необходимо провести детальную диагностику и запланировать ремонтные работы."
+        else:  # Zone D
+            sensor_list = ', '.join([f'Датчик {sid}' for sid in worst_zone_sensors])
+            other_c_sensors = [sid for sid, data in sorted_sensors if data['priority'] == 3]
+            other_b_sensors = [sid for sid, data in sorted_sensors if data['priority'] == 2]
+            
+            conclusion = f"КРИТИЧНО! {sensor_list} показывают значения в зоне D ({zone_names[worst_zone]}). Требуется немедленная остановка оборудования и проведение аварийного ремонта."
+            
+            if other_c_sensors:
+                conclusion += f" Датчики {', '.join([f'Датчик {sid}' for sid in other_c_sensors])} также в зоне C и требуют внимания."
+            if other_b_sensors:
+                conclusion += f" Датчики {', '.join([f'Датчик {sid}' for sid in other_b_sensors])} в зоне B - рекомендуется мониторинг."
+            
+            return conclusion
 
     def _styled_table(self, data: List[List[str]], col_widths: List[float]) -> Table:
         """Создать стилизованную таблицу с поддержкой кириллицы."""
@@ -395,6 +522,49 @@ class PDFReportGenerator:
             ('GRID', (0, 0), (-1, -1), 0.5, self.COLOR_LIGHT_GRAY),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.COLOR_WHITE, colors.HexColor('#F5F5F5')]),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ]
+
+        # Подсветка зон
+        zone_colors = {
+            'A': colors.HexColor('#E8F5E9'),
+            'B': colors.HexColor('#FFF9C4'),
+            'C': colors.HexColor('#FFE0B2'),
+            'D': colors.HexColor('#FFCDD2'),
+        }
+
+        for row_idx, row in enumerate(data[1:], start=1):
+            zone = row[-1] if row else '-'
+            if zone in zone_colors:
+                style_commands.append(
+                    ('BACKGROUND', (-1, row_idx), (-1, row_idx), zone_colors[zone])
+                )
+
+        table.setStyle(TableStyle(style_commands))
+        return table
+
+    def _styled_table_sensors(self, data: List[List[str]], col_widths: List[float]) -> Table:
+        """Создать стилизованную таблицу датчиков с группировкой."""
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        
+        # Используем зарегистрированные шрифты с кириллицей
+        font_name = CYRILLIC_FONT_NAME
+        font_bold = CYRILLIC_FONT_BOLD
+
+        style_commands = [
+            ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_BLACK),
+            ('TEXTCOLOR', (0, 0), (-1, 0), self.COLOR_WHITE),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), font_bold),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), self.COLOR_WHITE),
+            ('TEXTCOLOR', (0, 1), (-1, -1), self.COLOR_BLACK),
+            ('FONTNAME', (0, 1), (-1, -1), font_name),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, self.COLOR_LIGHT_GRAY),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.COLOR_WHITE, colors.HexColor('#F5F5F5')]),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),  # Датчик слева
+            ('ALIGN', (2, 0), (4, -1), 'CENTER'),  # RMS значения по центру
         ]
 
         # Подсветка зон
