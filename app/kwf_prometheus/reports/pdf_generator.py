@@ -38,8 +38,71 @@ except ImportError:
 
 # === Глобальная настройка кириллицы ===
 # Используем стандартные шрифты Windows с поддержкой кириллицы
-CYRILLIC_FONT_NAME = 'Arial'  # Arial есть в Windows и поддерживает кириллицу
-CYRILLIC_FONT_BOLD = 'Arial-Bold'
+CYRILLIC_FONT_NAME = 'Helvetica'  # Базовое имя
+CYRILLIC_FONT_BOLD = 'Helvetica-Bold'
+
+def _try_register_cyrillic_fonts():
+    """
+    Попытка зарегистрировать шрифты с поддержкой кириллицы.
+    Используем Arial из Windows или DejaVu Sans как fallback.
+    """
+    global CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD
+    
+    if not HAS_REPORTLAB:
+        return
+    
+    import os
+    import sys
+    
+    # Пуки к шрифтам в порядке приоритета
+    font_candidates = []
+    
+    # Windows - Arial
+    if sys.platform.startswith('win'):
+        font_candidates = [
+            ('Arial', r'C:\Windows\Fonts\arial.ttf'),
+            ('Arial-Bold', r'C:\Windows\Fonts\arialbd.ttf'),
+        ]
+    # macOS
+    elif sys.platform.startswith('darwin'):
+        font_candidates = [
+            ('Arial', '/Library/Fonts/Arial.ttf'),
+            ('Arial-Bold', '/Library/Fonts/Arial Bold.ttf'),
+        ]
+    # Linux
+    else:
+        font_candidates = [
+            ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
+            ('DejaVuSans-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
+        ]
+
+    # Пробуем зарегистрировать шрифты
+    registered = False
+    for font_name, font_path in font_candidates:
+        if os.path.exists(font_path):
+            try:
+                # Регистрируем TrueType шрифт с поддержкой Unicode
+                pdfmetrics.registerFont(TTFont(font_name, font_path))
+                logger.info("Зарегистрирован шрифт: %s = %s", font_name, font_path)
+                registered = True
+                
+                if font_name.lower().startswith('arial'):
+                    CYRILLIC_FONT_NAME = 'Arial'
+                    CYRILLIC_FONT_BOLD = 'Arial-Bold'
+                elif font_name.lower().startswith('dejavu'):
+                    CYRILLIC_FONT_NAME = 'DejaVuSans'
+                    CYRILLIC_FONT_BOLD = 'DejaVuSans-Bold'
+                    
+            except Exception as e:
+                logger.debug("Не удалось зарегистрировать шрифт %s: %s", font_path, e)
+    
+    if not registered:
+        logger.warning("Не удалось зарегистрировать шрифты с кириллицей. Используем Helvetica.")
+
+
+# Регистрируем шрифты при загрузке модуля
+if HAS_REPORTLAB:
+    _try_register_cyrillic_fonts()
 
 
 class PDFReportGenerator:
@@ -97,10 +160,9 @@ class PDFReportGenerator:
             story = []
             styles = getSampleStyleSheet()
 
-            # Используем стандартные шрифты Windows с поддержкой кириллицы
-            # Arial, Times New Roman, Calibri, Verdana - все поддерживают кириллицу
-            font_name = CYRILLIC_FONT_NAME  # Arial
-            font_bold = 'Arial-Bold'  # reportlab использует это имя
+            # Используем зарегистрированные шрифты с кириллицей
+            font_name = CYRILLIC_FONT_NAME
+            font_bold = CYRILLIC_FONT_BOLD
 
             # Кастомные стили с кириллическим шрифтом
             title_style = ParagraphStyle(
@@ -273,12 +335,12 @@ class PDFReportGenerator:
             return f"КРИТИЧНО! Датчик {worst_sensor} показывает значения в зоне D. Требуется немедленная остановка оборудования и проведение аварийного ремонта."
 
     def _styled_table(self, data: List[List[str]], col_widths: List[float]) -> Table:
-        """Создать стилизованную таблицу с поддержкой кириллицы (Arial)."""
+        """Создать стилизованную таблицу с поддержкой кириллицы."""
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
-        # Используем стандартные шрифты Windows
-        font_name = 'Arial'  # Стандартный шрифт Windows с кириллицей
-        font_bold = 'Arial-Bold'
+        # Используем зарегистрированные шрифты с кириллицей
+        font_name = CYRILLIC_FONT_NAME
+        font_bold = CYRILLIC_FONT_BOLD
 
         style_commands = [
             ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_BLACK),
