@@ -49,28 +49,35 @@ def _try_register_cyrillic_fonts():
     global CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD
     
     if not HAS_REPORTLAB:
+        logger.error("reportlab не установлен!")
         return
     
     import os
     import sys
+    
+    logger.info("=== НАЧАЛО РЕГИСТРАЦИИ ШРИФТОВ ===")
+    logger.info("Платформа: %s", sys.platform)
     
     # Пуки к шрифтам в порядке приоритета
     font_candidates = []
     
     # Windows - Arial
     if sys.platform.startswith('win'):
+        logger.info("Обнаружена Windows, используем Arial")
         font_candidates = [
             ('Arial', r'C:\Windows\Fonts\arial.ttf'),
             ('Arial-Bold', r'C:\Windows\Fonts\arialbd.ttf'),
         ]
     # macOS
     elif sys.platform.startswith('darwin'):
+        logger.info("Обнаружена macOS, используем Arial")
         font_candidates = [
             ('Arial', '/Library/Fonts/Arial.ttf'),
             ('Arial-Bold', '/Library/Fonts/Arial Bold.ttf'),
         ]
     # Linux
     else:
+        logger.info("Обнаружена Linux, используем DejaVuSans")
         font_candidates = [
             ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
             ('DejaVuSans-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
@@ -79,11 +86,13 @@ def _try_register_cyrillic_fonts():
     # Пробуем зарегистрировать шрифты
     registered = False
     for font_name, font_path in font_candidates:
+        logger.info("Проверка шрифта: %s = %s", font_name, font_path)
         if os.path.exists(font_path):
+            logger.info("Файл шрифта найден: %s", font_path)
             try:
                 # Регистрируем TrueType шрифт с поддержкой Unicode
                 pdfmetrics.registerFont(TTFont(font_name, font_path))
-                logger.info("Зарегистрирован шрифт: %s = %s", font_name, font_path)
+                logger.info("✅ УСПЕШНО зарегистрирован шрифт: %s = %s", font_name, font_path)
                 registered = True
                 
                 if font_name.lower().startswith('arial'):
@@ -94,10 +103,17 @@ def _try_register_cyrillic_fonts():
                     CYRILLIC_FONT_BOLD = 'DejaVuSans-Bold'
                     
             except Exception as e:
-                logger.debug("Не удалось зарегистрировать шрифт %s: %s", font_path, e)
+                logger.error("❌ ОШИБКА регистрации шрифта %s: %s", font_path, e, exc_info=True)
+        else:
+            logger.warning("Файл шрифта НЕ найден: %s", font_path)
     
     if not registered:
-        logger.warning("Не удалось зарегистрировать шрифты с кириллицей. Используем Helvetica.")
+        logger.error("❌ Не удалось зарегистрировать НИ ОДИН шрифт с кириллицей! Используем Helvetica.")
+        CYRILLIC_FONT_NAME = 'Helvetica'
+        CYRILLIC_FONT_BOLD = 'Helvetica-Bold'
+    else:
+        logger.info("=== ЗАВЕРШЕНИЕ РЕГИСТРАЦИИ ШРИФТОВ ===")
+        logger.info("Используемый шрифт: %s (bold: %s)", CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD)
 
 
 # Регистрируем шрифты при загрузке модуля
@@ -146,7 +162,11 @@ class PDFReportGenerator:
 
         try:
             file_path = Path(file_path)
+            logger.info("=" * 60)
             logger.info("Генерация PDF-отчёта: %s", file_path)
+            logger.info("Используемые шрифты: %s (bold: %s)", CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD)
+            logger.info("Доступные шрифты в reportlab: %s", list(pdfmetrics.getRegisteredFontNames()) if HAS_REPORTLAB else "N/A")
+            logger.info("=" * 60)
 
             doc = SimpleDocTemplate(
                 str(file_path),
