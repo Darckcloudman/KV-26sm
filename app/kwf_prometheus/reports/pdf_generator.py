@@ -92,7 +92,7 @@ def _try_register_cyrillic_fonts():
             try:
                 # Регистрируем TrueType шрифт с поддержкой Unicode
                 pdfmetrics.registerFont(TTFont(font_name, font_path))
-                logger.info("✅ УСПЕШНО зарегистрирован шрифт: %s = %s", font_name, font_path)
+                logger.info("[OK] Зарегистрирован шрифт: %s = %s", font_name, font_path)
                 registered = True
                 
                 if font_name.lower().startswith('arial'):
@@ -103,12 +103,12 @@ def _try_register_cyrillic_fonts():
                     CYRILLIC_FONT_BOLD = 'DejaVuSans-Bold'
                     
             except Exception as e:
-                logger.error("❌ ОШИБКА регистрации шрифта %s: %s", font_path, e, exc_info=True)
+                logger.error("[ERROR] Ошибка регистрации шрифта %s: %s", font_path, e, exc_info=True)
         else:
             logger.warning("Файл шрифта НЕ найден: %s", font_path)
     
     if not registered:
-        logger.error("❌ Не удалось зарегистрировать НИ ОДИН шрифт с кириллицей! Используем Helvetica.")
+        logger.error("[ERROR] Не удалось зарегистрировать ни один шрифт с кириллицей! Используем Helvetica.")
         CYRILLIC_FONT_NAME = 'Helvetica'
         CYRILLIC_FONT_BOLD = 'Helvetica-Bold'
     else:
