@@ -30,8 +30,6 @@ try:
     )
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
-    from reportlab.pdfbase.cidfonts import UnicodeFont, IdentityH
-    from reportlab.pdfbase import _fontdata
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
@@ -46,6 +44,7 @@ def _setup_cyrillic_fonts():
     Настроить шрифты с поддержкой кириллицы для reportlab.
     
     Возвращает имя шрифта для использования в стилях.
+    Использует TTFont для регистрации кириллических шрифтов.
     """
     global CYRILLIC_FONT_NAME
     if CYRILLIC_FONT_NAME is not None:
@@ -69,25 +68,24 @@ def _setup_cyrillic_fonts():
             if os.path.exists(font_path):
                 try:
                     pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
-                    pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', font_path.replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')))
+                    # Пробуем зарегистрировать Bold версию
+                    bold_path = font_path.replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
+                    if os.path.exists(bold_path):
+                        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', bold_path))
+                    else:
+                        # Если Bold нет, используем обычный с жирным начертанием
+                        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', font_path))
+                    
                     CYRILLIC_FONT_NAME = 'DejaVuSans'
                     logger.info("Зарегистрирован шрифт DejaVuSans: %s", font_path)
                     return 'DejaVuSans'
-                except Exception:
+                except Exception as e:
+                    logger.debug("Не удалось зарегистрировать шрифт %s: %s", font_path, e)
                     continue
         
-        # Если DejaVu не найден, используем Unicode шрифт
-        try:
-            unicode_font = UnicodeFont('Unicode', IdentityH())
-            pdfmetrics.registerFont(unicode_font)
-            CYRILLIC_FONT_NAME = 'Unicode'
-            logger.info("Зарегистрирован Unicode шрифт")
-            return 'Unicode'
-        except Exception:
-            pass
-        
-        # Fallback: стандартный шрифт
+        # Fallback: стандартный шрифт (будет использовать кодировку по умолчанию)
         CYRILLIC_FONT_NAME = 'Helvetica'
+        logger.info("Используем стандартный шрифт Helvetica")
         return 'Helvetica'
         
     except Exception as e:

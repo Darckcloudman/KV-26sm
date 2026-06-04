@@ -5,7 +5,7 @@
 
 import tempfile
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 from PySide6.QtCore import QThread, Signal
 
 from ..dal.logger import get_logger
@@ -33,7 +33,7 @@ class PDFReportWorker(QThread):
         self.parser = parser
         self.sensor_id = sensor_id
         self.file_path = Path(file_path)
-        self._temp_images = []
+        self._temp_images: List[str] = []
 
     def run(self):
         """Выполнить генерацию PDF."""
@@ -69,16 +69,16 @@ class PDFReportWorker(QThread):
         from ..utils.vibration_analysis import VibrationAnalyzer
 
         # === НАСТРОЙКА КИРИЛЛИЦЫ ДЛЯ MATPLOTLIB ===
-        import matplotlib
+        import matplotlib  # type: ignore[import-not-found]
         matplotlib.use('Agg')
         
         # Настройка шрифтов для поддержки кириллицы
         matplotlib.rcParams['font.family'] = 'DejaVu Sans'
         matplotlib.rcParams['axes.unicode_minus'] = False  # Для корректного отображения минуса
         
-        import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt  # type: ignore[import-not-found]
 
-        chart_images = {}
+        chart_images: dict = {}
         data = self.parser.get_sensor_data(self.sensor_id)
         if data is None:
             return chart_images
@@ -96,10 +96,10 @@ class PDFReportWorker(QThread):
                 ax.set_title(f'Датчик {self.sensor_id} — НЧ (0.1–10 Гц)', fontsize=11)
                 ax.grid(True, alpha=0.3)
                 ax.set_facecolor('white')
-                fig.patch.set_facecolor('white')
+                fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
 
                 temp_path = tempfile.mktemp(suffix='.png')
-                fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
+                fig.savefig(temp_path, bbox_inches='tight', dpi=100)
                 plt.close(fig)
                 chart_images['Временной ряд (НЧ)'] = temp_path
                 self._temp_images.append(temp_path)
@@ -122,10 +122,10 @@ class PDFReportWorker(QThread):
                 ax.set_title(f'Датчик {self.sensor_id} — Спектр НЧ', fontsize=11)
                 ax.grid(True, alpha=0.3)
                 ax.set_facecolor('white')
-                fig.patch.set_facecolor('white')
+                fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
 
                 temp_path = tempfile.mktemp(suffix='.png')
-                fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
+                fig.savefig(temp_path, bbox_inches='tight', dpi=100)
                 plt.close(fig)
                 chart_images['Спектр (НЧ)'] = temp_path
                 self._temp_images.append(temp_path)
@@ -148,10 +148,10 @@ class PDFReportWorker(QThread):
                 ax.set_title(f'Датчик {self.sensor_id} — Спектр ВЧ', fontsize=11)
                 ax.grid(True, alpha=0.3)
                 ax.set_facecolor('white')
-                fig.patch.set_facecolor('white')
+                fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
 
                 temp_path = tempfile.mktemp(suffix='.png')
-                fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
+                fig.savefig(temp_path, bbox_inches='tight', dpi=100)
                 plt.close(fig)
                 chart_images['Спектр (ВЧ)'] = temp_path
                 self._temp_images.append(temp_path)
