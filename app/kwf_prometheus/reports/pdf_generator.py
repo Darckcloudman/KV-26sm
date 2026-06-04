@@ -37,66 +37,88 @@ except ImportError:
 
 
 # === Глобальная настройка кириллицы ===
-CYRILLIC_FONT_NAME = None
+# Используем стандартные шрифты Windows с поддержкой кириллицы
+CYRILLIC_FONT_NAME = 'Arial'  # Arial есть в Windows по умолчанию
+CYRILLIC_FONT_BOLD = 'Arial-Bold'
 
-def _setup_cyrillic_fonts():
+def _try_register_cyrillic_fonts():
     """
-    Настроить шрифты с поддержкой кириллицы для reportlab.
-    
-    Возвращает имя шрифта для использования в стилях.
-    Использует TTFont для регистрации кириллических шрифтов.
+    Попытка зарегистрировать шрифты с поддержкой кириллицы.
+    Используем Arial из Windows или DejaVu Sans как fallback.
     """
-    global CYRILLIC_FONT_NAME
-    if CYRILLIC_FONT_NAME is not None:
-        return CYRILLIC_FONT_NAME
+    global CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD
     
     if not HAS_REPORTLAB:
-        return 'Helvetica'
+        logger.error("reportlab не установлен!")
+        return
     
-    try:
-        # Пытаемся зарегистрировать DejaVu Sans (лучшая поддержка кириллицы)
-        import os
+    import os
+    import sys
+    
+    logger.info("=== НАЧАЛО РЕГИСТРАЦИИ ШРИФТОВ ===")
+    logger.info("Платформа: %s", sys.platform)
+    
+    # Пути к шрифтам в порядке приоритета
+    font_candidates = []
+    
+    # Windows - Arial
+    if sys.platform.startswith('win'):
+        logger.info("Обнаружена Windows, используем Arial")
+        font_candidates = [
+            ('Arial', r'C:\Windows\Fonts\arial.ttf'),
+            ('Arial-Bold', r'C:\Windows\Fonts\arialbd.ttf'),
+        ]
+    # macOS
+    elif sys.platform.startswith('darwin'):
+        logger.info("Обнаружена macOS, используем Arial")
+        font_candidates = [
+            ('Arial', '/Library/Fonts/Arial.ttf'),
+            ('Arial-Bold', '/Library/Fonts/Arial Bold.ttf'),
+        ]
+    # Linux
+    else:
+        logger.info("Обнаружена Linux, используем DejaVuSans")
         font_candidates = [
             ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
-            ('DejaVuSans', '/usr/share/fonts/TTF/DejaVuSans.ttf'),
-            ('DejaVuSans', 'C:/Windows/Fonts/DejaVuSans.ttf'),
-            ('DejaVuSans', '/System/Library/Fonts/DejaVuSans.ttf'),
-            ('DejaVuSans', os.path.expanduser('~/.local/share/fonts/DejaVuSans.ttf')),
+            ('DejaVuSans-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
         ]
-        
-        for font_name, font_path in font_candidates:
-            if os.path.exists(font_path):
-                try:
-                    pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
-                    # Пробуем зарегистрировать Bold версию
-                    bold_path = font_path.replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
-                    if os.path.exists(bold_path):
-                        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', bold_path))
-                    else:
-                        # Если Bold нет, используем обычный с жирным начертанием
-                        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', font_path))
-                    
+
+    # Пробуем зарегистрировать шрифты
+    registered = False
+    for font_name, font_path in font_candidates:
+        logger.info("Проверка шрифта: %s = %s", font_name, font_path)
+        if os.path.exists(font_path):
+            logger.info("Файл шрифта найден: %s", font_path)
+            try:
+                # Регистрируем TrueType шрифт с поддержкой Unicode
+                pdfmetrics.registerFont(TTFont(font_name, font_path))
+                logger.info("[OK] Зарегистрирован шрифт: %s = %s", font_name, font_path)
+                registered = True
+                
+                if font_name.lower().startswith('arial'):
+                    CYRILLIC_FONT_NAME = 'Arial'
+                    CYRILLIC_FONT_BOLD = 'Arial-Bold'
+                elif font_name.lower().startswith('dejavu'):
                     CYRILLIC_FONT_NAME = 'DejaVuSans'
-                    logger.info("Зарегистрирован шрифт DejaVuSans: %s", font_path)
-                    return 'DejaVuSans'
-                except Exception as e:
-                    logger.debug("Не удалось зарегистрировать шрифт %s: %s", font_path, e)
-                    continue
-        
-        # Fallback: стандартный шрифт (будет использовать кодировку по умолчанию)
+                    CYRILLIC_FONT_BOLD = 'DejaVuSans-Bold'
+                    
+            except Exception as e:
+                logger.error("[ERROR] Ошибка регистрации шрифта %s: %s", font_path, e, exc_info=True)
+        else:
+            logger.warning("Файл шрифта НЕ найден: %s", font_path)
+    
+    if not registered:
+        logger.error("[ERROR] Не удалось зарегистрировать ни один шрифт с кириллицей! Используем Helvetica.")
         CYRILLIC_FONT_NAME = 'Helvetica'
-        logger.info("Используем стандартный шрифт Helvetica")
-        return 'Helvetica'
-        
-    except Exception as e:
-        logger.warning("Ошибка регистрации шрифтов: %s. Используем Helvetica.", e)
-        CYRILLIC_FONT_NAME = 'Helvetica'
-        return 'Helvetica'
+        CYRILLIC_FONT_BOLD = 'Helvetica-Bold'
+    else:
+        logger.info("=== ЗАВЕРШЕНИЕ РЕГИСТРАЦИИ ШРИФТОВ ===")
+        logger.info("Используемый шрифт: %s (bold: %s)", CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD)
 
 
-# Инициализируем шрифты при загрузке модуля
+# Регистрируем шрифты при загрузке модуля
 if HAS_REPORTLAB:
-    _setup_cyrillic_fonts()
+    _try_register_cyrillic_fonts()
 
 
 class PDFReportGenerator:
@@ -154,9 +176,9 @@ class PDFReportGenerator:
             story = []
             styles = getSampleStyleSheet()
 
-            # Получаем имя шрифта с поддержкой кириллицы
-            font_name = CYRILLIC_FONT_NAME or 'Helvetica'
-            font_bold = f'{font_name}-Bold' if font_name != 'Helvetica' else 'Helvetica-Bold'
+            # Используем зарегистрированные шрифты с кириллицей
+            font_name = CYRILLIC_FONT_NAME
+            font_bold = CYRILLIC_FONT_BOLD
 
             # Кастомные стили с кириллическим шрифтом
             title_style = ParagraphStyle(
@@ -332,9 +354,9 @@ class PDFReportGenerator:
         """Создать стилизованную таблицу с поддержкой кириллицы."""
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
-        # Получаем имя шрифта с поддержкой кириллицы
-        font_name = CYRILLIC_FONT_NAME or 'Helvetica'
-        font_bold = f'{font_name}-Bold' if font_name != 'Helvetica' else 'Helvetica-Bold'
+        # Используем зарегистрированные шрифты с кириллицей
+        font_name = CYRILLIC_FONT_NAME
+        font_bold = CYRILLIC_FONT_BOLD
 
         style_commands = [
             ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_BLACK),
