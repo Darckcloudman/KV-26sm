@@ -4,13 +4,17 @@
 """
 
 import numpy as np
+from typing import Optional, TYPE_CHECKING
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QFrame, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem,
-    QHeaderView, QGridLayout, QScrollArea
+    QHeaderView, QProgressDialog
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
+
+if TYPE_CHECKING:
+    from ..parsers.rd2_parser import MultiSensorRD2Parser
 
 from .styled_message_box import show_critical, show_info
 from .metric_card import MetricCard
@@ -47,15 +51,15 @@ class ZoneIndicator(QFrame):
 
         self.title_label = QLabel(title)
         self.title_label.setStyleSheet(f'color: {COLOR_TEXT_SECONDARY}; font-size: 10px;')
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
 
         self.zone_label = QLabel('-')
         self.zone_label.setStyleSheet(f'color: {COLOR_TEXT_PRIMARY}; font-size: 24px; font-weight: bold;')
-        self.zone_label.setAlignment(Qt.AlignCenter)
+        self.zone_label.setAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
 
         self.rms_label = QLabel('—')
         self.rms_label.setStyleSheet(f'color: {COLOR_TEXT_TERTIARY}; font-size: 9px;')
-        self.rms_label.setAlignment(Qt.AlignCenter)
+        self.rms_label.setAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
 
         layout.addWidget(self.title_label)
         layout.addWidget(self.zone_label)
@@ -86,7 +90,7 @@ class SensorStatusIndicator(QFrame):
         super().__init__(parent)
         self.sensor_id = sensor_id
         self.setFixedSize(80, 90)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.PointingHandCursor)  # type: ignore[arg-type]
         self.selected = False
 
         # Базовый стиль
@@ -106,7 +110,7 @@ class SensorStatusIndicator(QFrame):
         # Номер датчика
         self.id_label = QLabel(str(sensor_id))
         self.id_label.setStyleSheet(f'color: {COLOR_TEXT_PRIMARY}; font-size: 16px; font-weight: bold;')
-        self.id_label.setAlignment(Qt.AlignCenter)
+        self.id_label.setAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
         layout.addWidget(self.id_label)
 
         # 3 секции для НЧ/ВЧ/ВЧ(ф)
@@ -122,7 +126,7 @@ class SensorStatusIndicator(QFrame):
                     font-size: 8px;
                 }}
             """)
-            sec.setAlignment(Qt.AlignCenter)
+            sec.setAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
             layout.addWidget(sec)
             self.sections[section_name] = sec
 
@@ -162,11 +166,11 @@ class AnalysisDataScreen(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parser = None
+        self.parser: Optional['MultiSensorRD2Parser'] = None
         self._current_sensor = 1
-        self._sensor_zones = {}  # {sensor_id: {'acc': zone, 'vel': zone, 'hf': zone}}
-        self._all_peaks = []  # Данные пиков для таблицы
-        self._current_peaks = {}  # Пику по типам сигналов для графиков
+        self._sensor_zones: dict[int, dict[str, str]] = {}  # {sensor_id: {'acc': zone, 'vel': zone, 'hf': zone}}
+        self._all_peaks: list[dict] = []  # Данные пиков для таблицы
+        self._current_peaks: dict[str, list[dict]] = {}  # Пику по типам сигналов для графиков
         self._setup_ui()
 
     def _setup_ui(self):
@@ -303,10 +307,10 @@ class AnalysisDataScreen(QWidget):
         self.harmonics_table = QTableWidget()
         self.harmonics_table.setColumnCount(4)
         self.harmonics_table.setHorizontalHeaderLabels(['Пик', 'Частота (Гц)', 'Амплитуда', 'Зона'])
-        self.harmonics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.harmonics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)  # type: ignore[arg-type]
         self.harmonics_table.verticalHeader().setVisible(False)
-        self.harmonics_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.harmonics_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.harmonics_table.setSelectionBehavior(QTableWidget.SelectRows)  # type: ignore[arg-type]
+        self.harmonics_table.setSelectionMode(QTableWidget.SingleSelection)  # type: ignore[arg-type]
         self.harmonics_table.setMaximumHeight(180)
         self.harmonics_table.setStyleSheet(TABLE_STYLE + SCROLLBAR_STYLE)
         main_layout.addWidget(self.harmonics_table, 0)
@@ -351,6 +355,9 @@ class AnalysisDataScreen(QWidget):
 
     def _compute_all_sensor_zones(self):
         """Вычислить зоны ISO 10816 для всех датчиков."""
+        if self.parser is None:
+            return
+
         self._sensor_zones = {}
         analyzer = VibrationAnalyzer()
 
@@ -397,6 +404,9 @@ class AnalysisDataScreen(QWidget):
 
     def _select_sensor(self, sensor_id: int):
         """Выбрать датчик и обновить отображение."""
+        if self.parser is None:
+            return
+
         self._current_sensor = sensor_id
 
         # Обновляем выделение индикаторов
@@ -498,26 +508,26 @@ class AnalysisDataScreen(QWidget):
 
             # Пик №
             item0 = QTableWidgetItem(f"{row_idx + 1}")
-            item0.setTextAlignment(Qt.AlignCenter)
+            item0.setTextAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
             item0.setForeground(QColor(COLOR_TEXT_PRIMARY))
             self.harmonics_table.setItem(row_idx, 0, item0)
 
             # Тип сигнала
             item1 = QTableWidgetItem(peak['signal_type'])
-            item1.setTextAlignment(Qt.AlignCenter)
+            item1.setTextAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
             item1.setForeground(QColor(COLOR_TEXT_SECONDARY))
             self.harmonics_table.setItem(row_idx, 1, item1)
 
             # Частота
             item2 = QTableWidgetItem(f"{peak['frequency']:.2f}")
-            item2.setTextAlignment(Qt.AlignCenter)
+            item2.setTextAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
             item2.setForeground(QColor(COLOR_TEXT_PRIMARY))
             self.harmonics_table.setItem(row_idx, 2, item2)
 
             # Амплитуда + зона
             zone_color = ZONE_COLORS.get(peak['zone'], COLOR_TEXT_TERTIARY)
             item3 = QTableWidgetItem(f"{peak['amplitude']:.4f} {peak['unit']}")
-            item3.setTextAlignment(Qt.AlignCenter)
+            item3.setTextAlignment(Qt.AlignCenter)  # type: ignore[arg-type]
             item3.setForeground(QColor(zone_color))
             self.harmonics_table.setItem(row_idx, 3, item3)
 
@@ -691,11 +701,8 @@ class AnalysisDataScreen(QWidget):
 
     def _run_export_worker(self, export_type: str, sensor_id: int, file_path: str):
         """Запустить поток экспорта с прогресс-диалогом."""
-        from PySide6.QtWidgets import QProgressDialog
-        from PySide6.QtCore import Qt
-
         progress = QProgressDialog("Экспорт данных...", "Отмена", 0, 100, self)
-        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowModality(Qt.WindowModal)  # type: ignore[attr-defined]
         progress.setWindowTitle("Экспорт")
         progress.setStyleSheet("""
             QProgressDialog {
@@ -725,7 +732,7 @@ class AnalysisDataScreen(QWidget):
 
         from .export_thread import ExportWorker
         self.export_worker = ExportWorker(export_type, self.parser, sensor_id, file_path)
-        self.export_worker.progress.connect(lambda p, msg: progress.setValue(p) or progress.setLabelText(msg))
+        self.export_worker.progress.connect(lambda p, msg: (progress.setValue(p), progress.setLabelText(msg)))  # type: ignore[func-returns-value]
         self.export_worker.finished.connect(
             lambda ok, msg: self._on_export_finished(ok, msg, progress)
         )
@@ -746,11 +753,8 @@ class AnalysisDataScreen(QWidget):
 
     def _run_pdf_worker(self, sensor_id: int, file_path: str):
         """Запустить генерацию PDF с прогресс-диалогом."""
-        from PySide6.QtWidgets import QProgressDialog
-        from PySide6.QtCore import Qt
-
         progress = QProgressDialog("Формирование PDF-отчёта...", "Отмена", 0, 100, self)
-        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowModality(Qt.WindowModal)  # type: ignore[attr-defined]
         progress.setWindowTitle("PDF-отчёт")
         progress.setStyleSheet("""
             QProgressDialog {
@@ -780,7 +784,7 @@ class AnalysisDataScreen(QWidget):
 
         from .pdf_report_thread import PDFReportWorker
         self.pdf_worker = PDFReportWorker(self.parser, sensor_id, file_path)
-        self.pdf_worker.progress.connect(lambda p, msg: progress.setValue(p) or progress.setLabelText(msg))
+        self.pdf_worker.progress.connect(lambda p, msg: (progress.setValue(p), progress.setLabelText(msg)))  # type: ignore[func-returns-value]
         self.pdf_worker.finished.connect(
             lambda ok, msg: self._on_export_finished(ok, msg, progress)
         )

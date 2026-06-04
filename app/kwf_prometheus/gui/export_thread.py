@@ -4,6 +4,7 @@
 """
 
 from pathlib import Path
+from typing import Union
 from PySide6.QtCore import QThread, Signal
 
 from ..dal.logger import get_logger
@@ -19,7 +20,7 @@ class ExportWorker(QThread):
     progress = Signal(int, str)  # процент, сообщение
     finished = Signal(bool, str)  # успех, сообщение
 
-    def __init__(self, export_type: str, parser, sensor_id: int, file_path: Path, parent=None):
+    def __init__(self, export_type: str, parser, sensor_id: int, file_path: Union[str, Path], parent=None):
         """
         Инициализация потока экспорта.
 
