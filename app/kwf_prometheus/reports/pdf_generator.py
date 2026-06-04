@@ -137,15 +137,38 @@ class PDFReportGenerator:
         self.data = parser.get_sensor_data(sensor_id) if parser else None
         self.metrics = parser.get_turbine_metrics() if parser else {}
 
-        # Получаем дату записи из данных парсера (если доступна)
-        self.record_date = None
-        if parser and hasattr(parser, 'metadata') and parser.metadata:
-            self.record_date = parser.metadata.get('record_date')
+        # Получаем дату записи из метрик парсера
+        self.record_date = self.metrics.get('record_datetime')
+        
+        # Если дата не найдена в метаданных, пробуем из имени файла
+        if not self.record_date and parser and hasattr(parser, 'archive_path'):
+            filepath = str(parser.archive_path)
+            # Пробуем найти дату в формате YYYYMMDD или DDMMYYYY
+            import re
+            date_match = re.search(r'(\d{4})(\d{2})(\d{2})', filepath)
+            if date_match:
+                try:
+                    year, month, day = date_match.groups()
+                    from datetime import datetime
+                    self.record_date = f"{day}.{month}.{year}"
+                except Exception:
+                    pass
 
-        # Группы датчиков
+        # Группы датчиков (1-5 редуктор, 6-8 генератор)
         self.sensor_groups = {
-            'Редуктор': [1, 2, 3, 4],
-            'Генератор': [5, 6, 7, 8]
+            'Редуктор': [1, 2, 3, 4, 5],
+            'Генератор': [6, 7, 8]
+        }
+
+        # Названия позиций датчиков
+        self.sensor_positions = {
+            1: 'Вход редуктора, радиальное направление',
+            2: 'Передающая часть редуктора',
+            3: 'Сателлит нижняя часть редуктора',
+            4: 'Выход трансмиссии, радиальное направление',
+            5: 'Выход трансмиссии, осевое направление',
+            6: 'Подшипник генератора со стороны ротора, осевое направление',
+            7: 'Подшипник генератора со стороны ротора, радиальное направление'
         }
 
         # Цвета (чёрно-белая тема) — лениво, только при наличии reportlab
@@ -228,23 +251,65 @@ class PDFReportGenerator:
             )
 
             # === Заголовок ===
-            story.append(Paragraph("Отчёт по вибродиагностике ВЭУ", title_style))
-            
-            # Добавляем информацию о турбине и дате записи
             turbine_id = self.metrics.get('turbine_id', 'Не указано')
+            wtg_id = self.metrics.get('wtg_id', '')
+            
+            # Извлекаем номер ВЭУ из WTG ID (приоритет) или из turbine ID
+            # Форматы: WTG40 -> ВЭУ 40, W1436 -> ВЭУ 1436
+            turbine_name = "ВЭУ"
+            turbine_number = ""
+            
+            # Сначала пробуем WTG ID (приоритет)
+            if wtg_id and str(wtg_id).startswith('WTG'):
+                # WTG40 -> ВЭУ 40
+                turbine_number = str(wtg_id)[3:]
+                turbine_name = f"ВЭУ {turbine_number}"
+            elif str(turbine_id).startswith('WTG'):
+                turbine_number = str(turbine_id)[3:]
+                turbine_name = f"ВЭУ {turbine_number}"
+            elif str(turbine_id).startswith('W') and len(str(turbine_id)) > 1:
+                # W1436 -> ВЭУ 1436
+                turbine_number = str(turbine_id)[1:]
+                turbine_name = f"ВЭУ {turbine_number}"
+            elif str(turbine_id).isdigit():
+                turbine_number = str(turbine_id)
+                turbine_name = f"ВЭУ {turbine_number}"
+            
+            if not turbine_number:
+                turbine_name = "ВЭУ"
+            
+            story.append(Paragraph(f"Отчёт по вибродиагностике {turbine_name}", title_style))
+            
+            # Добавляем информацию о дате записи (выровнено по центру)
             if self.record_date:
                 try:
-                    if isinstance(self.record_date, datetime):
-                        date_str = self.record_date.strftime('%d.%m.%Y %H:%M')
-                    else:
-                        date_str = str(self.record_date)
-                except Exception:
+                    # Пробуем распарсить дату в разных форматах
                     date_str = str(self.record_date)
+                    if '/' in date_str and len(date_str) > 10:
+                        # Формат: 01/09/2025 23:50:37
+                        date_part = date_str.split()[0] if ' ' in date_str else date_str
+                        date_str = date_part.replace('/', '.')
+                    elif len(date_str) == 8 and date_str.isdigit():
+                        # Формат: 20250901
+                        date_str = f"{date_str[6:8]}.{date_str[4:6]}.{date_str[:4]}"
+                    elif ' ' in date_str:
+                        # Формат: 01/09/2025 23:50:37
+                        date_str = date_str.split(' ')[0].replace('/', '.')
+                except Exception:
+                    pass
             else:
                 date_str = "Дата записи не указана"
             
-            header_info = f"Турбина: {turbine_id} | Дата записи: {date_str}"
-            story.append(Paragraph(header_info, normal_style))
+            # Дата по центру
+            info_style_centered = ParagraphStyle(
+                'CustomInfoCentered',
+                parent=styles['Normal'],
+                fontSize=9,
+                textColor=self.COLOR_GRAY,
+                alignment=TA_CENTER,
+                fontName=font_name
+            )
+            story.append(Paragraph(f"Дата записи: {date_str}", info_style_centered))
             story.append(Spacer(1, 4*mm))
 
             # === Информация о турбине ===
@@ -258,25 +323,27 @@ class PDFReportGenerator:
             story.append(Spacer(1, 6*mm))
 
             # === Топ-10 пиков для выбранного датчика ===
-            story.append(Paragraph("3. Топ-10 пиков вибрации", heading_style))
+            # Получаем название позиции датчика
+            sensor_position = self.sensor_positions.get(self.sensor_id, 'Не указано')
+            peaks_title = f"3. Топ-10 пиков вибрации: Датчик {self.sensor_id} - {sensor_position}"
+            story.append(Paragraph(peaks_title, heading_style))
             story.append(self._create_peaks_table())
             story.append(Spacer(1, 10*mm))
 
-            # Перенос на новую страницу
-            story.append(PageBreak())
-
             # === Графики ===
+            story.append(Paragraph("4. Графики вибрации", heading_style))
             if chart_images:
-                story.append(Paragraph("4. Графики вибрации", heading_style))
                 for name, img_path in chart_images.items():
                     if Path(img_path).exists():
                         story.append(Paragraph(f"<b>{name}</b>", normal_style))
                         img = Image(str(img_path), width=170*mm, height=85*mm)
                         story.append(img)
                         story.append(Spacer(1, 4*mm))
+            else:
+                story.append(Paragraph("Графики недоступны", normal_style))
 
             # === Заключение ===
-            story.append(Paragraph("4. Заключение", heading_style))
+            story.append(Paragraph("5. Заключение", heading_style))
             conclusion = self._generate_conclusion()
             story.append(Paragraph(conclusion, normal_style))
             story.append(Spacer(1, 10*mm))
@@ -298,9 +365,11 @@ class PDFReportGenerator:
     def _create_turbine_table(self) -> Table:
         """Создать таблицу параметров турбины."""
         turbine_id = self.metrics.get('turbine_id', 'Не указано')
+        wtg_id = self.metrics.get('wtg_id', '')
+        
         data = [
             ['Параметр', 'Значение', 'Единица'],
-            ['ID турбины', str(turbine_id), '-'],
+            ['ID турбины', str(turbine_id), str(wtg_id) if wtg_id else '-'],
             ['Мощность', f"{self.metrics.get('power_kw', 0):.1f}", 'кВт'],
             ['Частота вращения', f"{self.metrics.get('generator_speed_rpm', 0):.1f}", 'об/мин'],
             ['Скорость ветра', f"{self.metrics.get('wind_speed_ms', 0):.1f}", 'м/с'],
@@ -503,7 +572,7 @@ class PDFReportGenerator:
     def _styled_table(self, data: List[List[str]], col_widths: List[float]) -> Table:
         """Создать стилизованную таблицу с поддержкой кириллицы."""
         table = Table(data, colWidths=col_widths, repeatRows=1)
-
+        
         # Используем зарегистрированные шрифты с кириллицей
         font_name = CYRILLIC_FONT_NAME
         font_bold = CYRILLIC_FONT_BOLD
