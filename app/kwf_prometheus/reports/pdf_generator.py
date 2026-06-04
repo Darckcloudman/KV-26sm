@@ -28,10 +28,77 @@ try:
         SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
         Image, PageBreak, KeepTogether
     )
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfbase.cidfonts import UnicodeFont, IdentityH
+    from reportlab.pdfbase import _fontdata
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
     logger.warning("reportlab не установлен. PDF-отчёты недоступны.")
+
+
+# === Глобальная настройка кириллицы ===
+CYRILLIC_FONT_NAME = None
+
+def _setup_cyrillic_fonts():
+    """
+    Настроить шрифты с поддержкой кириллицы для reportlab.
+    
+    Возвращает имя шрифта для использования в стилях.
+    """
+    global CYRILLIC_FONT_NAME
+    if CYRILLIC_FONT_NAME is not None:
+        return CYRILLIC_FONT_NAME
+    
+    if not HAS_REPORTLAB:
+        return 'Helvetica'
+    
+    try:
+        # Пытаемся зарегистрировать DejaVu Sans (лучшая поддержка кириллицы)
+        import os
+        font_candidates = [
+            ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
+            ('DejaVuSans', '/usr/share/fonts/TTF/DejaVuSans.ttf'),
+            ('DejaVuSans', 'C:/Windows/Fonts/DejaVuSans.ttf'),
+            ('DejaVuSans', '/System/Library/Fonts/DejaVuSans.ttf'),
+            ('DejaVuSans', os.path.expanduser('~/.local/share/fonts/DejaVuSans.ttf')),
+        ]
+        
+        for font_name, font_path in font_candidates:
+            if os.path.exists(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+                    pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', font_path.replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')))
+                    CYRILLIC_FONT_NAME = 'DejaVuSans'
+                    logger.info("Зарегистрирован шрифт DejaVuSans: %s", font_path)
+                    return 'DejaVuSans'
+                except Exception:
+                    continue
+        
+        # Если DejaVu не найден, используем Unicode шрифт
+        try:
+            unicode_font = UnicodeFont('Unicode', IdentityH())
+            pdfmetrics.registerFont(unicode_font)
+            CYRILLIC_FONT_NAME = 'Unicode'
+            logger.info("Зарегистрирован Unicode шрифт")
+            return 'Unicode'
+        except Exception:
+            pass
+        
+        # Fallback: стандартный шрифт
+        CYRILLIC_FONT_NAME = 'Helvetica'
+        return 'Helvetica'
+        
+    except Exception as e:
+        logger.warning("Ошибка регистрации шрифтов: %s. Используем Helvetica.", e)
+        CYRILLIC_FONT_NAME = 'Helvetica'
+        return 'Helvetica'
+
+
+# Инициализируем шрифты при загрузке модуля
+if HAS_REPORTLAB:
+    _setup_cyrillic_fonts()
 
 
 class PDFReportGenerator:
@@ -89,7 +156,11 @@ class PDFReportGenerator:
             story = []
             styles = getSampleStyleSheet()
 
-            # Кастомные стили
+            # Получаем имя шрифта с поддержкой кириллицы
+            font_name = CYRILLIC_FONT_NAME or 'Helvetica'
+            font_bold = f'{font_name}-Bold' if font_name != 'Helvetica' else 'Helvetica-Bold'
+
+            # Кастомные стили с кириллическим шрифтом
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
@@ -97,7 +168,7 @@ class PDFReportGenerator:
                 textColor=self.COLOR_BLACK,
                 spaceAfter=12,
                 alignment=TA_CENTER,
-                fontName='Helvetica-Bold'
+                fontName=font_bold
             )
             heading_style = ParagraphStyle(
                 'CustomHeading',
@@ -106,21 +177,23 @@ class PDFReportGenerator:
                 textColor=self.COLOR_BLACK,
                 spaceAfter=8,
                 spaceBefore=12,
-                fontName='Helvetica-Bold'
+                fontName=font_bold
             )
             normal_style = ParagraphStyle(
                 'CustomNormal',
                 parent=styles['Normal'],
                 fontSize=10,
                 textColor=self.COLOR_BLACK,
-                spaceAfter=6
+                spaceAfter=6,
+                fontName=font_name
             )
             info_style = ParagraphStyle(
                 'CustomInfo',
                 parent=styles['Normal'],
                 fontSize=9,
                 textColor=self.COLOR_GRAY,
-                alignment=TA_RIGHT
+                alignment=TA_RIGHT,
+                fontName=font_name
             )
 
             # === Заголовок ===
@@ -258,19 +331,23 @@ class PDFReportGenerator:
             return f"КРИТИЧНО! Датчик {worst_sensor} показывает значения в зоне D. Требуется немедленная остановка оборудования и проведение аварийного ремонта."
 
     def _styled_table(self, data: List[List[str]], col_widths: List[float]) -> Table:
-        """Создать стилизованную таблицу."""
+        """Создать стилизованную таблицу с поддержкой кириллицы."""
         table = Table(data, colWidths=col_widths, repeatRows=1)
+
+        # Получаем имя шрифта с поддержкой кириллицы
+        font_name = CYRILLIC_FONT_NAME or 'Helvetica'
+        font_bold = f'{font_name}-Bold' if font_name != 'Helvetica' else 'Helvetica-Bold'
 
         style_commands = [
             ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_BLACK),
             ('TEXTCOLOR', (0, 0), (-1, 0), self.COLOR_WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), font_bold),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('BACKGROUND', (0, 1), (-1, -1), self.COLOR_WHITE),
             ('TEXTCOLOR', (0, 1), (-1, -1), self.COLOR_BLACK),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTNAME', (0, 1), (-1, -1), font_name),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('GRID', (0, 0), (-1, -1), 0.5, self.COLOR_LIGHT_GRAY),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.COLOR_WHITE, colors.HexColor('#F5F5F5')]),

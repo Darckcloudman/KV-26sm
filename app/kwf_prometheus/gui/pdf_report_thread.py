@@ -64,9 +64,19 @@ class PDFReportWorker(QThread):
             self.finished.emit(False, f"Ошибка: {str(e)}")
 
     def _generate_chart_images(self) -> dict:
-        """Сгенерировать временные PNG-изображения графиков."""
+        """Сгенерировать временные PNG-изображения графиков с поддержкой кириллицы."""
         import numpy as np
         from ..utils.vibration_analysis import VibrationAnalyzer
+
+        # === НАСТРОЙКА КИРИЛЛИЦЫ ДЛЯ MATPLOTLIB ===
+        import matplotlib
+        matplotlib.use('Agg')
+        
+        # Настройка шрифтов для поддержки кириллицы
+        matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+        matplotlib.rcParams['axes.unicode_minus'] = False  # Для корректного отображения минуса
+        
+        import matplotlib.pyplot as plt
 
         chart_images = {}
         data = self.parser.get_sensor_data(self.sensor_id)
@@ -79,10 +89,6 @@ class PDFReportWorker(QThread):
         if data.get('acceleration') is not None and data.get('acceleration_time') is not None:
             self.progress.emit(20, "Создание графика временного ряда...")
             try:
-                import matplotlib
-                matplotlib.use('Agg')
-                import matplotlib.pyplot as plt
-
                 fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
                 ax.plot(data['acceleration_time'], data['acceleration'], color='black', linewidth=0.8)
                 ax.set_xlabel('Время, с', fontsize=10)
@@ -93,7 +99,7 @@ class PDFReportWorker(QThread):
                 fig.patch.set_facecolor('white')
 
                 temp_path = tempfile.mktemp(suffix='.png')
-                fig.savefig(temp_path, bbox_inches='tight', dpi=100)
+                fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
                 plt.close(fig)
                 chart_images['Временной ряд (НЧ)'] = temp_path
                 self._temp_images.append(temp_path)
@@ -104,10 +110,6 @@ class PDFReportWorker(QThread):
         if data.get('acceleration') is not None and data.get('acceleration_fs'):
             self.progress.emit(35, "Создание спектра...")
             try:
-                import matplotlib
-                matplotlib.use('Agg')
-                import matplotlib.pyplot as plt
-
                 acc = np.array(data['acceleration'])
                 fs = data['acceleration_fs']
                 freqs, amps = analyzer.calculate_spectrum(acc, fs)
@@ -123,7 +125,7 @@ class PDFReportWorker(QThread):
                 fig.patch.set_facecolor('white')
 
                 temp_path = tempfile.mktemp(suffix='.png')
-                fig.savefig(temp_path, bbox_inches='tight', dpi=100)
+                fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
                 plt.close(fig)
                 chart_images['Спектр (НЧ)'] = temp_path
                 self._temp_images.append(temp_path)
@@ -134,10 +136,6 @@ class PDFReportWorker(QThread):
         if data.get('velocity') is not None and data.get('velocity_fs'):
             self.progress.emit(45, "Создание спектра ВЧ...")
             try:
-                import matplotlib
-                matplotlib.use('Agg')
-                import matplotlib.pyplot as plt
-
                 vel = np.array(data['velocity'])
                 fs = data['velocity_fs']
                 freqs, amps = analyzer.calculate_spectrum(vel, fs)
@@ -153,7 +151,7 @@ class PDFReportWorker(QThread):
                 fig.patch.set_facecolor('white')
 
                 temp_path = tempfile.mktemp(suffix='.png')
-                fig.savefig(temp_path, bbox_inches='tight', dpi=100)
+                fig.savefig(temp_path, bbox_inches='tight', dpi=100, encoding='utf-8')
                 plt.close(fig)
                 chart_images['Спектр (ВЧ)'] = temp_path
                 self._temp_images.append(temp_path)
