@@ -12,6 +12,10 @@
 
 ## Решение
 
+Используем **стандартные шрифты Windows с поддержкой кириллицы**:
+- **Arial** - основной шрифт (есть во всех версиях Windows)
+- **Arial-Bold** - для заголовков и жирного текста
+
 ### 1. matplotlib (файл `pdf_report_thread.py`)
 
 ```python
@@ -20,80 +24,55 @@ import matplotlib  # type: ignore[import-not-found]
 matplotlib.use('Agg')
 
 # Настройка шрифтов для поддержки кириллицы
-matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+# Arial - стандартный шрифт Windows с кириллицей
+matplotlib.rcParams['font.family'] = 'Arial'
 matplotlib.rcParams['axes.unicode_minus'] = False  # Корректное отображение минуса
 
 import matplotlib.pyplot as plt  # type: ignore[import-not-found]
-
-# Использование в графиках
-fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
-ax.set_xlabel('Время, с', fontsize=10)
-ax.set_ylabel('Ускорение, м/с²', fontsize=10)
-fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
-
-fig.savefig(temp_path, bbox_inches='tight', dpi=100)
 ```
 
 ### 2. reportlab (файл `pdf_generator.py`)
 
 ```python
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+# Используем стандартные шрифты Windows
+CYRILLIC_FONT_NAME = 'Arial'  # Есть в Windows по умолчанию
+CYRILLIC_FONT_BOLD = 'Arial-Bold'
 
-CYRILLIC_FONT_NAME = None
+# В стилях:
+font_name = 'Arial'
+font_bold = 'Arial-Bold'
 
-def _setup_cyrillic_fonts():
-    """Настроить шрифты с поддержкой кириллицы через TTFont."""
-    global CYRILLIC_FONT_NAME
-    
-    font_paths = [
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        'C:/Windows/Fonts/DejaVuSans.ttf',
-        # ... другие пути
-    ]
-    
-    for font_path in font_paths:
-        if os.path.exists(font_path):
-            pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
-            CYRILLIC_FONT_NAME = 'DejaVuSans'
-            return 'DejaVuSans'
-    
-    # Fallback: Helvetica
-    CYRILLIC_FONT_NAME = 'Helvetica'
-    return 'Helvetica'
-
-# Глобальная инициализация
-if HAS_REPORTLAB:
-    _setup_cyrillic_fonts()
-
-# Использование в стилях
-font_name = CYRILLIC_FONT_NAME or 'Helvetica'
 normal_style = ParagraphStyle(
     'CustomNormal',
-    fontName=font_name,  # <-- Используем кириллический шрифт
+    fontName='Arial',  # <-- Стандартный шрифт Windows
     fontSize=10,
     # ...
 )
 ```
 
-## Установленные шрифты
+## Преимущества Arial
+
+| Шрифт | Windows | Linux | macOS | Кириллица |
+|-------|---------|-------|-------|-----------|
+| **Arial** | ✅ Встроен | ✅ Обычно есть | ✅ Есть | ✅ Да |
+| DejaVu Sans | ❌ Нет | ⚠️ Нужно ставить | ⚠️ Нужно ставить | ✅ Да |
+| Helvetica | ⚠️ Нет | ✅ Есть | ✅ Есть | ❌ Нет |
+
+## Установка (не требуется для Windows)
+
+### Windows
+**Ничего устанавливать не нужно!** Arial уже есть в системе.
 
 ### Linux
 ```bash
-sudo apt-get install fonts-dejavu-core
+# Шрифты Microsoft (включая Arial)
+sudo apt-get install msttcorefonts
 # или
-sudo yum install dejavu-sans-fonts
+sudo yum install msttcorefonts
 ```
-
-### Windows
-Шрифт DejaVu Sans необходимо установить вручную:
-1. Скачать с https://dejavu-fonts.github.io/
-2. Установить в `C:\Windows\Fonts\`
 
 ### macOS
-```bash
-brew install --cask font-dejavu
-```
+Arial предустановлен в macOS.
 
 ## Профилактика будущих ошибок
 
@@ -184,6 +163,7 @@ matplotlib.rcParams['font.family'] = 'DejaVu Sans'
 | 1.4.1 | 2026 | Добавлена поддержка кириллицы в PDF |
 | 1.4.2 | 2026 | Улучшена обработка отсутствующих шрифтов |
 | 1.4.3 | 2026 | Исправлены ошибки type checking: <br>• Удалены UnicodeFont, IdentityH, _fontdata <br>• Добавлены type ignore для matplotlib <br>• Упрощена регистрация шрифтов (только TTFont) |
+| **1.4.4** | **2026** | **Переход на Arial** - стандартный шрифт Windows: <br>• Не требует установки <br>• Есть во всех версиях Windows <br>• Полная поддержка кириллицы |
 
 ## Контакты
 

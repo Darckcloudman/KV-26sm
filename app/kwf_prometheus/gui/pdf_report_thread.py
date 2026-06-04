@@ -73,7 +73,8 @@ class PDFReportWorker(QThread):
         matplotlib.use('Agg')
         
         # Настройка шрифтов для поддержки кириллицы
-        matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+        # Используем Arial - стандартный шрифт Windows с поддержкой кириллицы
+        matplotlib.rcParams['font.family'] = 'Arial'
         matplotlib.rcParams['axes.unicode_minus'] = False  # Для корректного отображения минуса
         
         import matplotlib.pyplot as plt  # type: ignore[import-not-found]

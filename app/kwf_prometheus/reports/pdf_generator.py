@@ -37,66 +37,9 @@ except ImportError:
 
 
 # === Глобальная настройка кириллицы ===
-CYRILLIC_FONT_NAME = None
-
-def _setup_cyrillic_fonts():
-    """
-    Настроить шрифты с поддержкой кириллицы для reportlab.
-    
-    Возвращает имя шрифта для использования в стилях.
-    Использует TTFont для регистрации кириллических шрифтов.
-    """
-    global CYRILLIC_FONT_NAME
-    if CYRILLIC_FONT_NAME is not None:
-        return CYRILLIC_FONT_NAME
-    
-    if not HAS_REPORTLAB:
-        return 'Helvetica'
-    
-    try:
-        # Пытаемся зарегистрировать DejaVu Sans (лучшая поддержка кириллицы)
-        import os
-        font_candidates = [
-            ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
-            ('DejaVuSans', '/usr/share/fonts/TTF/DejaVuSans.ttf'),
-            ('DejaVuSans', 'C:/Windows/Fonts/DejaVuSans.ttf'),
-            ('DejaVuSans', '/System/Library/Fonts/DejaVuSans.ttf'),
-            ('DejaVuSans', os.path.expanduser('~/.local/share/fonts/DejaVuSans.ttf')),
-        ]
-        
-        for font_name, font_path in font_candidates:
-            if os.path.exists(font_path):
-                try:
-                    pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
-                    # Пробуем зарегистрировать Bold версию
-                    bold_path = font_path.replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
-                    if os.path.exists(bold_path):
-                        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', bold_path))
-                    else:
-                        # Если Bold нет, используем обычный с жирным начертанием
-                        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', font_path))
-                    
-                    CYRILLIC_FONT_NAME = 'DejaVuSans'
-                    logger.info("Зарегистрирован шрифт DejaVuSans: %s", font_path)
-                    return 'DejaVuSans'
-                except Exception as e:
-                    logger.debug("Не удалось зарегистрировать шрифт %s: %s", font_path, e)
-                    continue
-        
-        # Fallback: стандартный шрифт (будет использовать кодировку по умолчанию)
-        CYRILLIC_FONT_NAME = 'Helvetica'
-        logger.info("Используем стандартный шрифт Helvetica")
-        return 'Helvetica'
-        
-    except Exception as e:
-        logger.warning("Ошибка регистрации шрифтов: %s. Используем Helvetica.", e)
-        CYRILLIC_FONT_NAME = 'Helvetica'
-        return 'Helvetica'
-
-
-# Инициализируем шрифты при загрузке модуля
-if HAS_REPORTLAB:
-    _setup_cyrillic_fonts()
+# Используем стандартные шрифты Windows с поддержкой кириллицы
+CYRILLIC_FONT_NAME = 'Arial'  # Arial есть в Windows и поддерживает кириллицу
+CYRILLIC_FONT_BOLD = 'Arial-Bold'
 
 
 class PDFReportGenerator:
@@ -154,9 +97,10 @@ class PDFReportGenerator:
             story = []
             styles = getSampleStyleSheet()
 
-            # Получаем имя шрифта с поддержкой кириллицы
-            font_name = CYRILLIC_FONT_NAME or 'Helvetica'
-            font_bold = f'{font_name}-Bold' if font_name != 'Helvetica' else 'Helvetica-Bold'
+            # Используем стандартные шрифты Windows с поддержкой кириллицы
+            # Arial, Times New Roman, Calibri, Verdana - все поддерживают кириллицу
+            font_name = CYRILLIC_FONT_NAME  # Arial
+            font_bold = 'Arial-Bold'  # reportlab использует это имя
 
             # Кастомные стили с кириллическим шрифтом
             title_style = ParagraphStyle(
@@ -329,12 +273,12 @@ class PDFReportGenerator:
             return f"КРИТИЧНО! Датчик {worst_sensor} показывает значения в зоне D. Требуется немедленная остановка оборудования и проведение аварийного ремонта."
 
     def _styled_table(self, data: List[List[str]], col_widths: List[float]) -> Table:
-        """Создать стилизованную таблицу с поддержкой кириллицы."""
+        """Создать стилизованную таблицу с поддержкой кириллицы (Arial)."""
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
-        # Получаем имя шрифта с поддержкой кириллицы
-        font_name = CYRILLIC_FONT_NAME or 'Helvetica'
-        font_bold = f'{font_name}-Bold' if font_name != 'Helvetica' else 'Helvetica-Bold'
+        # Используем стандартные шрифты Windows
+        font_name = 'Arial'  # Стандартный шрифт Windows с кириллицей
+        font_bold = 'Arial-Bold'
 
         style_commands = [
             ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_BLACK),
