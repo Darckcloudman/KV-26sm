@@ -677,7 +677,10 @@ class MultiSensorRD2Parser:
             'power_kw': float(self.turbine_metadata.get('active_power', 0)),
             'generator_speed_rpm': float(self.turbine_metadata.get('generator_speed', 0)),
             'wind_speed_ms': float(self.turbine_metadata.get('wind_speed', 0)),
-            'cumulative_power_kwh': float(self.turbine_metadata.get('cumulative_power', 0))
+            'cumulative_power_kwh': float(self.turbine_metadata.get('cumulative_power', 0)),
+            'turbine_id': self.turbine_metadata.get('turbine_id', 'Не указано'),
+            'wtg_id': self.turbine_metadata.get('wtg_id', 'Не указано'),
+            'record_datetime': self.turbine_metadata.get('record_datetime', None)
         }
 
     def get_sensor_data(self, sensor_id: int) -> Optional[Dict]:
