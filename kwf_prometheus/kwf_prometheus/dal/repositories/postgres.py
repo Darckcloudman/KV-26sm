@@ -1037,3 +1037,165 @@ class PostgresRepository(IVibrationRepository):
                         })
                 
                 return trend_data
+
+    @_with_retry(max_retries=3, delay=1.0)
+    async def get_records_timeline(
+        self,
+        wtg_id: str,
+        start_date: Any,
+        end_date: Any
+    ) -> Optional[Dict[str, int]]:
+        """
+        Получить количество записей по дням за период.
+        
+        Args:
+            wtg_id: Идентификатор турбины.
+            start_date: Начальная дата (datetime).
+            end_date: Конечная дата (datetime).
+            
+        Returns:
+            Словарь {'YYYY-MM-DD': count}.
+        """
+        from sqlalchemy import func
+        
+        logger.debug(
+            "Получение timeline для %s: %s - %s", 
+            wtg_id, start_date, end_date
+        )
+        
+        async with self.db_manager.session_factory() as session:
+            # Находим турбину
+            result = await session.execute(
+                select(Turbine).where(Turbine.wtg_id == wtg_id)
+            )
+            turbine = result.scalar_one_or_none()
+            
+            if turbine is None:
+                logger.warning("Турбина %s не найдена", wtg_id)
+                return {}
+            
+            # Группируем архивы по датам
+            timeline_result = await session.execute(
+                select(
+                    func.date(Archive.record_datetime).label('date'),
+                    func.count(func.distinct(Archive.id)).label('count')
+                )
+                .where(
+                    and_(
+                        Archive.turbine_id == turbine.id,
+                        Archive.record_datetime >= start_date,
+                        Archive.record_datetime <= end_date
+                    )
+                )
+                .group_by(func.date(Archive.record_datetime))
+                .order_by(func.date(Archive.record_datetime).asc())
+            )
+            
+            timeline = {}
+            for date, count in timeline_result.all():
+                if date:
+                    date_str = date.strftime("%Y-%m-%d")
+                    timeline[date_str] = count
+            
+            logger.debug("Timeline: %d дней", len(timeline))
+            return timeline
+
+    @_with_retry(max_retries=3, delay=1.0)
+    async def get_vh_spectrum_data(
+        self,
+        wtg_id: str,
+        sensor_id: int,
+        start_date: Any,
+        end_date: Any,
+        max_points: int = 5000
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Получить данные ВЧ(ф) спектра для 3D визуализации.
+        
+        Args:
+            wtg_id: Идентификатор турбины.
+            sensor_id: Номер датчика (1-8).
+            start_date: Начальная дата.
+            end_date: Конечная дата.
+            max_points: Максимальное количество точек.
+            
+        Returns:
+            Список {'timestamp': datetime, 'frequency': float, 'amplitude': float}.
+        """
+        from sqlalchemy import func
+        import numpy as np
+        
+        logger.debug(
+            "Получение ВЧ(ф) спектра: %s, датчик %d, %s - %s", 
+            wtg_id, sensor_id, start_date, end_date
+        )
+        
+        async with self.db_manager.session_factory() as session:
+            # Находим турбину
+            result = await session.execute(
+                select(Turbine).where(Turbine.wtg_id == wtg_id)
+            )
+            turbine = result.scalar_one_or_none()
+            
+            if turbine is None:
+                logger.warning("Турбина %s не найдена", wtg_id)
+                return []
+            
+            # Получаем архивы за период для данного датчика
+            archives_result = await session.execute(
+                select(Archive, SensorData)
+                .join(SensorData, Archive.id == SensorData.archive_id)
+                .where(
+                    and_(
+                        Archive.turbine_id == turbine.id,
+                        Archive.sensor_id == sensor_id,
+                        Archive.filter_type == 'HIGH',  # ВЧ(ф)
+                        Archive.record_datetime >= start_date,
+                        Archive.record_datetime <= end_date,
+                        SensorData.values.isnot(None)
+                    )
+                )
+                .order_by(Archive.record_datetime.asc())
+                .limit(max_points // 100)  # Ограничиваем количество архивов
+            )
+            
+            data_points = []
+            for archive, sensor_data in archives_result.all():
+                if not sensor_data.values or not archive.record_datetime:
+                    continue
+                
+                # Вычисляем FFT для получения спектра
+                try:
+                    values = np.array(sensor_data.values)
+                    fs = sensor_data.sampling_frequency or 25600.0
+                    
+                    # FFT
+                    n = len(values)
+                    if n < 100:  # Слишком мало данных
+                        continue
+                    
+                    fft_result = np.fft.rfft(values)
+                    frequencies = np.fft.rfftfreq(n, d=1/fs)
+                    amplitudes = np.abs(fft_result) * 2 / n
+                    
+                    # Берём несколько пиковых частот
+                    n_peaks = min(50, len(frequencies) // 10)
+                    peak_indices = np.argsort(amplitudes)[-n_peaks:]
+                    
+                    for idx in peak_indices:
+                        if frequencies[idx] > 0 and amplitudes[idx] > 0:
+                            data_points.append({
+                                'timestamp': archive.record_datetime,
+                                'frequency': float(frequencies[idx]),
+                                'amplitude': float(amplitudes[idx])
+                            })
+                
+                except Exception as e:
+                    logger.warning(
+                        "Ошибка вычисления FFT для архива %d: %s",
+                        archive.id, e
+                    )
+                    continue
+            
+            logger.debug("Получено %d точек спектра", len(data_points))
+            return data_points

@@ -238,3 +238,50 @@ class IVibrationRepository(ABC):
             Список точек {date, rms_total} для построения графика.
         """
         pass
+
+    @abstractmethod
+    async def get_records_timeline(
+        self,
+        wtg_id: str,
+        start_date: Any,
+        end_date: Any
+    ) -> Optional[Dict[str, int]]:
+        """
+        Получить количество записей по дням за период.
+        
+        Args:
+            wtg_id: Идентификатор турбины (например, 'WTG37').
+            start_date: Начальная дата (datetime).
+            end_date: Конечная дата (datetime).
+            
+        Returns:
+            Словарь {date_str: count} где date_str в формате "YYYY-MM-DD".
+        """
+        pass
+
+    @abstractmethod
+    async def get_vh_spectrum_data(
+        self,
+        wtg_id: str,
+        sensor_id: int,
+        start_date: Any,
+        end_date: Any,
+        max_points: int = 5000
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Получить данные ВЧ(ф) спектра для 3D визуализации.
+        
+        Args:
+            wtg_id: Идентификатор турбины.
+            sensor_id: Номер датчика (1-8).
+            start_date: Начальная дата.
+            end_date: Конечная дата.
+            max_points: Максимальное количество точек (для оптимизации).
+            
+        Returns:
+            Список записей:
+            - timestamp: datetime записи
+            - frequency: частота (Гц)
+            - amplitude: амплитуда (мм/с²)
+        """
+        pass
