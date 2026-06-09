@@ -7,7 +7,16 @@ echo.
 
 cd /d D:\Coding\pyton_pro\app
 
-echo [1/3] Очистка кэша Python...
+echo [1/3] Синхронизация версий...
+xcopy /E /I /Y "D:\Coding\pyton_pro\kwf_prometheus" "D:\Coding\pyton_pro\app\kwf_prometheus" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   ✓ Версии синхронизированы
+) else (
+    echo   ⚠ Предупреждение синхронизации
+)
+echo.
+
+echo [2/3] Очистка кэша Python...
 if exist kwf_prometheus\__pycache__ (
     rd /s /q kwf_prometheus\__pycache__
     echo   ✓ Удалён kwf_prometheus\__pycache__
@@ -50,14 +59,14 @@ if exist tests\__pycache__ (
 )
 echo.
 
-echo [2/3] Проверка версии...
+echo [3/4] Проверка версии...
 python -c "from kwf_prometheus.main import *; print('   Версия приложения:', '1.4.3')" 2>nul
 if errorlevel 1 (
     echo   ⚠ Не удалось проверить версию, продолжаю запуск...
 )
 echo.
 
-echo [3/3] Запуск приложения...
+echo [4/4] Запуск приложения...
 echo.
 set PYTHONPATH=D:\Coding\pyton_pro\app
 python -m kwf_prometheus.main
