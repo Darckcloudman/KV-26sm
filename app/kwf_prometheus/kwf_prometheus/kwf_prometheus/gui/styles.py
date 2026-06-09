@@ -1,0 +1,1 @@
+﻿cd app; .\venv\Scripts\python.exe -m kwf_prometheus.main

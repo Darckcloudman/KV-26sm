@@ -496,9 +496,7 @@ class MainWindow(QMainWindow):
             self._update_mode_indicator()
 
     def _on_mode_changed(self, mode: str):
-        """Обработчик изменения режима (file/postgres)."""
-        logger.info(f"Режим изменён: {mode}")
-        
+        """Обработка смены режима."""
         if not hasattr(self, 'status_icon'):
             return
         self._update_status_icon('db' if mode == 'postgres' else 'file')
@@ -510,28 +508,16 @@ class MainWindow(QMainWindow):
         if mode == 'postgres':
             self._init_db_services()
         
-        # Обновляем все экраны с новым репозиторием
-        self._update_all_screens()
-
-    def _update_all_screens(self):
-        """Обновить репозитории во всех экранах."""
-        logger.info("Обновление репозиториев во всех экранах...")
-        
         # Обновляем HomeScreen
-        if hasattr(self, 'home_screen'):
-            self.home_screen.set_repository(self.repository_switcher.repository)
-            self.home_screen.persistence_service = self.persistence_service
-            self.home_screen.auto_scan_service = self.auto_scan_service
+        self.home_screen.set_repository(self.repository_switcher.repository)
+        self.home_screen.persistence_service = self.persistence_service
+        self.home_screen.auto_scan_service = self.auto_scan_service
         
         # Обновляем TrendsScreen
-        if hasattr(self, 'trends_screen'):
-            self.trends_screen.repository = self.repository_switcher.repository
+        self.trends_screen.repository = self.repository_switcher.repository
         
         # Обновляем UploadInfoScreen
-        if hasattr(self, 'upload_info_screen'):
-            self.upload_info_screen.repository = self.repository_switcher.repository
-        
-        logger.info("Все экраны обновлены")
+        self.upload_info_screen.repository = self.repository_switcher.repository
 
     def _update_mode_indicator(self):
         """Обновить индикатор режима в статус-баре."""
@@ -558,44 +544,12 @@ class MainWindow(QMainWindow):
 
     def _on_settings_changed(self):
         """Обработчик изменения настроек (динамическое применение)."""
-        logger.info("Применение изменений настроек...")
-        
-        # Переключаем репозиторий через RepositorySwitcher
-        try:
-            self.repository = self.repository_switcher.switch_mode(settings.use_database)
-            logger.info(f"Репозиторий переключён: {self.repository_switcher.mode}")
-            
-            # Обновляем все экраны с новым репозиторием
-            self._update_all_screens()
-            
-            # Пересоздаём persistence_service если нужно
-            if settings.use_database and self.repository_switcher.mode == 'postgres':
-                try:
-                    from ..dal.repositories.postgres import PostgresRepository
-                    from ..services.data_persistence import DataPersistenceService
-                    
-                    if isinstance(self.repository, PostgresRepository):
-                        self.persistence_service = DataPersistenceService(self.repository)
-                        logger.info("DataPersistenceService обновлён для PostgreSQL")
-                except Exception as e:
-                    logger.error(f"Ошибка обновления DataPersistenceService: {e}")
-            else:
-                self.persistence_service = None
-            
-            self._update_mode_indicator()
-            
-            show_info(
-                self,
-                "Настройки применены",
-                f"Режим изменён на: {'PostgreSQL' if settings.use_database else 'Файловая система'}"
-            )
-        except Exception as e:
-            logger.error(f"Ошибка при переключении репозитория: {e}", exc_info=True)
-            show_warning(
-                self,
-                "Ошибка переключения",
-                f"Не удалось переключить режим: {e}\nПриложение продолжит работу в предыдущем режиме."
-            )
+        self._update_mode_indicator()
+        show_info(
+            self,
+            "Настройки применены",
+            "Изменения настроек применены."
+        )
 
     def _update_time(self):
         """Обновить время в статус-баре."""
