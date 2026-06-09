@@ -378,3 +378,23 @@ class FileSystemRepository(IVibrationRepository):
     ) -> List[Dict[str, Any]]:
         """В файловом режиме — пустой список."""
         return []
+
+    async def get_records_timeline(
+        self,
+        wtg_id: str,
+        start_date: Any,
+        end_date: Any
+    ) -> Optional[Dict[str, int]]:
+        """Р' С„Р°Р№Р»РѕРІРѕРј СЂРµР¶РёРјРµ вЂ” РЅРµРґРѕСЃС‚СѓРїРЅРѕ."""
+        return {}
+
+    async def get_vh_spectrum_data(
+        self,
+        wtg_id: str,
+        sensor_id: int,
+        start_date: Any,
+        end_date: Any,
+        max_points: int = 5000
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Р' С„Р°Р№Р»РѕРІРѕРј СЂРµР¶РёРјРµ вЂ” РЅРµРґРѕСЃС‚СѓРїРЅРѕ."""
+        return []

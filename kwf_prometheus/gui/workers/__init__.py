@@ -5,5 +5,6 @@
 
 from .statistics_worker import StatisticsWorker
 from .trends_worker import TrendsWorker
+from .spectrum_worker import SpectrumDataWorker
 
-__all__ = ['StatisticsWorker', 'TrendsWorker']
+__all__ = ['StatisticsWorker', 'TrendsWorker', 'SpectrumDataWorker']

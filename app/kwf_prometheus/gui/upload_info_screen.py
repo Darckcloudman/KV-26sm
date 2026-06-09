@@ -1,25 +1,36 @@
-"""Экран информации о загрузке файлов"""
+﻿# -*- coding: utf-8 -*-
+"""
+Экран информации о загрузке файлов v1.4.3
+- Название ВЭУ без префикса "ВЭУ:"
+- Селектор датчиков с подсветкой статусов
+- 3D график ВЧ(ф) слева
+- Статистика записей справа
+"""
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QFrame, QGridLayout
+    QFrame, QSizePolicy
 )
-from PySide6.QtCore import Qt, QThread
-from PySide6.QtGui import QFont
-from typing import Dict, List, Optional
-from pathlib import Path
+from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtGui import QFont, QPainter, QPen, QColor, QLinearGradient
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+import numpy as np
 
 from ..dal.config import settings
 from ..dal.repositories.base import IVibrationRepository
 from .workers.statistics_worker import StatisticsWorker
+from .workers.spectrum_worker import SpectrumDataWorker
 from .ui_styles import (
-    COLOR_BG_PRIMARY, COLOR_BG_SECONDARY, COLOR_BG_TERTIARY,
+    COLOR_BG_PRIMARY, COLOR_BG_SECONDARY, COLOR_BG_TERTIARY, COLOR_BG_DARK,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY, COLOR_TEXT_TERTIARY,
-    COLOR_ACCENT, COLOR_BORDER, BUTTON_STYLE
+    COLOR_ACCENT, COLOR_ACCENT_HOVER, COLOR_BORDER,
+    FONT_FAMILY, FONT_FAMILY_MONO,
+    BUTTON_STYLE
 )
 
 
-# Описание датчиков согласно обновлённой спецификации
+# Описание датчиков
 SENSOR_DESCRIPTIONS = {
     1: "Главный вал радиальный",
     2: "Редуктор передняя нижняя часть радиальный",
@@ -32,429 +43,291 @@ SENSOR_DESCRIPTIONS = {
 }
 
 
-class UploadInfoScreen(QWidget):
-    """Экран информации о загрузке"""
+class SensorSelector(QFrame):
+    """Панель выбора датчика с 8 кнопками (разделены на группы) с подсветкой статуса."""
     
-    def __init__(self, repository: Optional[IVibrationRepository] = None, parent=None):
+    sensor_selected = Signal(int)
+    
+    # Цвета статусов
+    STATUS_COMPLETE = "#00C853"  # Зелёный - полностью загружен
+    STATUS_PARTIAL = "#FFC107"   # Оранжевый - частично загружен
+    STATUS_MISSING = "#DD2C00"   # Красный - отсутствует
+    
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.repository = repository
-        self._loaded_sensors: Dict[int, dict] = {}  # sensor_id -> result
-        self._sensor_files: Dict[int, Dict[str, str]] = {}  # sensor_id -> {file_type: filepath}
-        self._turbine_name: str = "Неизвестная ВЭУ"
-        self._generator_speed: str = ""
-        self._active_power: str = ""
-        self._record_length: str = ""
-        self._record_number: str = ""
-        self._record_datetime: str = ""
-        self._statistics_worker: Optional[StatisticsWorker] = None
-        
-        self._init_ui()
-    
-    def _init_ui(self):
-        """Инициализация интерфейса"""
-        layout = QVBoxLayout()
-        layout.setSpacing(20)
-        layout.setContentsMargins(30, 30, 30, 30)
-        
-        # Заголовок
-        title_label = QLabel("ИНФОРМАЦИЯ О ЗАГРУЗКЕ")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet(f"""
-            font-size: 22px;
-            font-weight: bold;
-            color: {COLOR_TEXT_PRIMARY};
-            padding: 15px;
-            border-bottom: 2px solid {COLOR_BORDER};
-        """)
-        layout.addWidget(title_label)
-        
-        # Информация о ВЭУ и параметрах записи
-        self.turbine_label = QLabel("ВЭУ: Неизвестная")
-        self.turbine_label.setStyleSheet(f"""
-            font-size: 16px;
-            color: {COLOR_TEXT_PRIMARY};
-            padding: 10px;
-            background-color: {COLOR_BG_SECONDARY};
-            border-radius: 5px;
-        """)
-        layout.addWidget(self.turbine_label)
-        
-        # Параметры записи
-        self.params_label = QLabel("")
-        self.params_label.setStyleSheet(f"""
-            font-size: 13px;
-            color: {COLOR_TEXT_SECONDARY};
-            padding: 10px;
-            background-color: {COLOR_BG_TERTIARY};
-            border: 1px solid {COLOR_BORDER};
-            border-radius: 5px;
-        """)
-        self.params_label.setWordWrap(True)
-        layout.addWidget(self.params_label)
-        
-        # Блок статистики из БД (только если USE_DATABASE=true)
-        self.stats_frame = QFrame()
-        self.stats_frame.setStyleSheet(f"""
+        self.setStyleSheet(f"""
             QFrame {{
-                background-color: {COLOR_BG_SECONDARY};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 5px;
-            }}
-        """)
-        self.stats_frame.setVisible(False)
-        
-        stats_layout = QVBoxLayout(self.stats_frame)
-        stats_layout.setContentsMargins(15, 15, 15, 15)
-        stats_layout.setSpacing(10)
-        
-        stats_title = QLabel("Статистика по ВЭУ (из БД)")
-        stats_title.setStyleSheet(f"""
-            font-size: 14px;
-            font-weight: bold;
-            color: {COLOR_TEXT_PRIMARY};
-        """)
-        stats_layout.addWidget(stats_title)
-        
-        self.stats_grid = QGridLayout()
-        self.stats_grid.setSpacing(10)
-        
-        # Метки для статистики
-        self.stat_total_label = self._create_stat_label("Всего записей:", "—")
-        self.stat_first_label = self._create_stat_label("Первая запись:", "—")
-        self.stat_last_label = self._create_stat_label("Последняя запись:", "—")
-        self.stat_critical_label = self._create_stat_label("Критических (зона D):", "—")
-        self.stat_avg_rms_label = self._create_stat_label("Средний RMS (датчик 1):", "—")
-        
-        self.stats_grid.addWidget(self.stat_total_label, 0, 0)
-        self.stats_grid.addWidget(self.stat_first_label, 0, 1)
-        self.stats_grid.addWidget(self.stat_last_label, 1, 0)
-        self.stats_grid.addWidget(self.stat_critical_label, 1, 1)
-        self.stats_grid.addWidget(self.stat_avg_rms_label, 2, 0)
-        
-        stats_layout.addLayout(self.stats_grid)
-        
-        # Статус загрузки
-        self.stats_status = QLabel("")
-        self.stats_status.setStyleSheet(f"color: {COLOR_TEXT_TERTIARY}; font-size: 11px;")
-        stats_layout.addWidget(self.stats_status)
-        
-        layout.addWidget(self.stats_frame)
-        
-        # Счётчик датчиков
-        self.counter_label = QLabel("")
-        self.counter_label.setStyleSheet(f"""
-            font-size: 14px;
-            color: {COLOR_TEXT_SECONDARY};
-            padding: 10px;
-            font-weight: bold;
-        """)
-        layout.addWidget(self.counter_label)
-        
-        # Список датчиков
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{
-                border: 1px solid {COLOR_BORDER};
                 background-color: {COLOR_BG_TERTIARY};
-                border-radius: 5px;
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 4px;
             }}
         """)
+        self.selected_sensor = 1
+        self.sensor_status = {}
         
-        sensors_widget = QWidget()
-        self.sensors_layout = QVBoxLayout()
-        self.sensors_layout.setSpacing(10)
-        sensors_widget.setLayout(self.sensors_layout)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 6, 8, 6)
+        main_layout.setSpacing(4)
         
-        scroll.setWidget(sensors_widget)
-        layout.addWidget(scroll, stretch=1)
+        # Группа 1: Редуктор (датчики 1-5)
+        gearbox_layout = QHBoxLayout()
+        gearbox_layout.setSpacing(4)
+        gearbox_label = QLabel('Редуктор:')
+        gearbox_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 9px; font-weight: bold;")
+        gearbox_layout.addWidget(gearbox_label)
         
-        # Кнопки
-        btn_layout = QHBoxLayout()
+        self.buttons = {}
+        for sensor_id in range(1, 6):
+            btn = QPushButton(str(sensor_id))
+            btn.setFixedSize(32, 32)
+            self._update_button_style(btn, sensor_id)
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked, sid=sensor_id: self._on_sensor_clicked(sid))
+            gearbox_layout.addWidget(btn)
+            self.buttons[sensor_id] = btn
         
-        self.btn_back = QPushButton("<- Назад к выбору")
-        self.btn_back.setFixedWidth(180)
-        self.btn_back.setStyleSheet(BUTTON_STYLE)
-        self.btn_back.clicked.connect(self._on_back)
-        btn_layout.addWidget(self.btn_back)
+        main_layout.addLayout(gearbox_layout)
         
-        self.btn_process = QPushButton("[>] Обработать")
-        self.btn_process.setFixedWidth(180)
-        self.btn_process.setStyleSheet(BUTTON_STYLE)
-        self.btn_process.setEnabled(False)
-        self.btn_process.clicked.connect(self._on_process)
-        btn_layout.addWidget(self.btn_process)
+        # Группа 2: Генератор (датчики 6-8)
+        generator_layout = QHBoxLayout()
+        generator_layout.setSpacing(4)
+        generator_label = QLabel('Генератор:')
+        generator_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 9px; font-weight: bold;")
+        generator_layout.addWidget(generator_label)
         
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        for sensor_id in range(6, 9):
+            btn = QPushButton(str(sensor_id))
+            btn.setFixedSize(32, 32)
+            self._update_button_style(btn, sensor_id)
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked, sid=sensor_id: self._on_sensor_clicked(sid))
+            generator_layout.addWidget(btn)
+            self.buttons[sensor_id] = btn
         
-        self.setLayout(layout)
+        main_layout.addLayout(generator_layout)
+        self.buttons[1].setChecked(True)
     
-    def _create_stat_label(self, title: str, value: str) -> QLabel:
-        """Создать метку статистики."""
-        label = QLabel(f"<b>{title}</b> {value}")
-        label.setStyleSheet(f"""
-            color: {COLOR_TEXT_SECONDARY};
-            font-size: 12px;
-            padding: 5px;
-            background-color: {COLOR_BG_TERTIARY};
-            border-radius: 3px;
-        """)
-        return label
-    
-    def set_upload_data(self, turbine_name: str, loaded_sensors: Dict[int, dict],
-                       sensor_files: Optional[Dict[int, Dict[str, str]]] = None,
-                       generator_speed: str = "", active_power: str = "", 
-                       record_length: str = "", record_number: str = "", record_datetime: str = ""):
-        """
-        Установка данных о загрузке
+    def _update_button_style(self, btn: QPushButton, sensor_id: int):
+        """Обновить стиль кнопки в зависимости от статуса."""
+        status = self.sensor_status.get(sensor_id, self.STATUS_MISSING)
         
-        Args:
-            turbine_name: название ветротурбины
-            loaded_sensors: словарь загруженных датчиков {sensor_id: result}
-            sensor_files: словарь файлов по датчикам {sensor_id: {file_type: filepath}}
-            generator_speed: скорость генератора (например, "1123 RPM")
-            active_power: активная мощность (например, "2334 KW")
-            record_length: длина записи (например, "64 s")
-            record_number: номер записи (первые 5 цифр)
-            record_datetime: дата и время записи
-        """
-        self._turbine_name = turbine_name
-        self._loaded_sensors = loaded_sensors
-        self._sensor_files = sensor_files or {}
-        self._generator_speed = generator_speed
-        self._active_power = active_power
-        self._record_length = record_length
-        self._record_number = record_number
-        self._record_datetime = record_datetime
-        self._update_display()
-    
-        # Загружаем статистику из БД
-        self._load_statistics(turbine_name)
-    
-    def _load_statistics(self, wtg_id: str):
-        """Загрузить статистику по ВЭУ из БД."""
-        # Проверяем, используется ли БД
-        if not settings.use_database or not self.repository:
-            self.stats_frame.setVisible(False)
-            return
-        
-        # Показываем статус загрузки
-        self.stats_frame.setVisible(True)
-        self.stats_status.setText("Загрузка статистики...")
-        
-        # Останавливаем предыдущий воркер
-        if self._statistics_worker and self._statistics_worker.isRunning():
-            self._statistics_worker.terminate()
-        
-        # Создаём и запускаем воркер
-        self._statistics_worker = StatisticsWorker(self.repository, wtg_id, self)
-        self._statistics_worker.statistics_ready.connect(self._on_statistics_loaded)
-        self._statistics_worker.error.connect(self._on_statistics_error)
-        self._statistics_worker.start()
-    
-    def _on_statistics_loaded(self, stats: Optional[Dict]):
-        """Обработка загрузки статистики."""
-        if stats is None:
-            self.stats_status.setText("Нет данных в БД для этой ВЭУ")
-            return
-        
-        # Форматируем и отображаем
-        total = stats.get('total_archives', 0)
-        first_record = stats.get('first_record')
-        last_record = stats.get('last_record')
-        critical_count = stats.get('critical_count', 0)
-        avg_rms_per_sensor = stats.get('avg_rms_per_sensor', {})
-        
-        # Форматируем даты
-        first_str = first_record.strftime("%d.%m.%Y %H:%M") if first_record else "—"
-        last_str = last_record.strftime("%d.%m.%Y %H:%M") if last_record else "—"
-        
-        # Средний RMS датчика 1
-        avg_rms_1 = avg_rms_per_sensor.get(1, 0.0)
-        avg_rms_str = f"{avg_rms_1:.2f} мм/с" if avg_rms_1 else "—"
-        
-        # Обновляем метки
-        self.stat_total_label.setText(f"<b>Всего записей:</b> {total}")
-        self.stat_first_label.setText(f"<b>Первая запись:</b> {first_str}")
-        self.stat_last_label.setText(f"<b>Последняя запись:</b> {last_str}")
-        
-        # Критические с цветом
-        crit_color = "#DD2C00" if critical_count > 0 else "#00C853"
-        self.stat_critical_label.setText(
-            f"<b>Критических (зона D):</b> <span style='color: {crit_color}; font-weight: bold;'>{critical_count}</span>"
-        )
-        
-        # RMS с зоной
-        zone = self._get_zone(avg_rms_1)
-        zone_color = {"A": "#00C853", "B": "#FFC107", "C": "#FF9800", "D": "#DD2C00"}.get(zone, "#FFFFFF")
-        self.stat_avg_rms_label.setText(
-            f"<b>Средний RMS (датчик 1):</b> <span style='color: {zone_color}; font-weight: bold;'>{avg_rms_str}</span> (зона {zone})"
-        )
-        
-        self.stats_status.setText("Статистика загружена")
-    
-    def _on_statistics_error(self, error_msg: str):
-        """Обработка ошибки загрузки статистики."""
-        self.stats_status.setText(f"Ошибка: {error_msg}")
-    
-    def _get_zone(self, rms: float) -> str:
-        """Определить зону по RMS."""
-        if rms < 2.3:
-            return "A"
-        elif rms < 4.5:
-            return "B"
-        elif rms < 7.8:
-            return "C"
-        else:
-            return "D"
-    
-    def _update_display(self):
-        """Обновление отображения"""
-        # Обновляем название ВЭУ
-        self.turbine_label.setText(f"ВЭУ: {self._turbine_name}")
-        
-        # Обновляем параметры записи
-        params_parts = []
-        if self._generator_speed:
-            params_parts.append(f"Скорость генератора: {self._generator_speed}")
-        if self._active_power:
-            params_parts.append(f"Активная мощность: {self._active_power}")
-        if self._record_length:
-            params_parts.append(f"Длина записи: {self._record_length}")
-        if self._record_number:
-            params_parts.append(f"Номер записи: {self._record_number}")
-        if self._record_datetime:
-            params_parts.append(f"Дата/время: {self._record_datetime}")
-        
-        params_text = "\n".join(params_parts) if params_parts else "Параметры не определены"
-        self.params_label.setText(params_text)
-        
-        # Определяем загруженные и отсутствующие датчики
-        loaded_ids = sorted(self._loaded_sensors.keys())
-        all_ids = set(range(1, 9))
-        missing_ids = sorted(all_ids - set(loaded_ids))
-        
-        # Проверяем полноту файлов для каждого датчика
-        complete_sensors = []
-        incomplete_sensors = []
-        
-        for sensor_id in loaded_ids:
-            files = self._sensor_files.get(sensor_id, {})
-            has_filter = 'FILTER' in files
-            has_high = 'HIGH' in files
-            has_low = 'LOW' in files
-            
-            if has_filter and has_high and has_low:
-                complete_sensors.append(sensor_id)
-            else:
-                incomplete_sensors.append(sensor_id)
-        
-        # Обновляем счётчик
-        if len(loaded_ids) == 8 and len(incomplete_sensors) == 0:
-            self.counter_label.setText("[+] Все датчики загружены полностью (по 3 файла каждый)")
-            self.counter_label.setStyleSheet("""
-                font-size: 14px;
-                color: #00ff00;
-                padding: 10px;
-                font-weight: bold;
-            """)
-        elif len(loaded_ids) == 8:
-            self.counter_label.setText(
-                f"[!] Все 8 датчиков загружены, но {len(incomplete_sensors)} имеют неполный набор файлов"
-            )
-            self.counter_label.setStyleSheet("""
-                font-size: 14px;
-                color: #ffa500;
-                padding: 10px;
-                font-weight: bold;
+        if self.selected_sensor == sensor_id:
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {status};
+                    color: {COLOR_BG_PRIMARY};
+                    border: 2px solid {status};
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLOR_ACCENT_HOVER};
+                    border: 2px solid {COLOR_ACCENT};
+                }}
             """)
         else:
-            missing_str = ", ".join(map(str, missing_ids)) if missing_ids else "нет"
-            self.counter_label.setText(
-                f"Загружено: {len(loaded_ids)} из 8. Отсутствуют датчики: {missing_str}"
-            )
-            self.counter_label.setStyleSheet("""
-                font-size: 14px;
-                color: #ffa500;
-                padding: 10px;
-                font-weight: bold;
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLOR_BG_SECONDARY};
+                    color: {status};
+                    border: 1px solid {status};
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLOR_BG_TERTIARY};
+                    color: {COLOR_TEXT_PRIMARY};
+                    border: 1px solid {COLOR_TEXT_PRIMARY};
+                }}
             """)
-        
-        # Обновляем список датчиков
-        for i in range(self.sensors_layout.count()):
-            item = self.sensors_layout.itemAt(i)
-            if item is not None:
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
-        
-        for sensor_id in range(1, 9):
-            frame = QFrame()
-            frame.setStyleSheet("""
-                QFrame {
-                    background-color: #1a1a1a;
-                    border: 1px solid #333333;
-                    border-radius: 5px;
-                }
-            """)
-            
-            frame_layout = QHBoxLayout()
-            
-            # Статус и полнота файлов
-            if sensor_id in self._loaded_sensors:
-                files = self._sensor_files.get(sensor_id, {})
-                has_filter = 'FILTER' in files
-                has_high = 'HIGH' in files
-                has_low = 'LOW' in files
-                
-                if has_filter and has_high and has_low:
-                    status = "[OK]"
-                    status_color = "#00ff00"
-                else:
-                    missing = []
-                    if not has_filter: missing.append("FILTER")
-                    if not has_high: missing.append("HIGH")
-                    if not has_low: missing.append("LOW")
-                    status = f"[~] {', '.join(missing)}"
-                    status_color = "#ffa500"
-            else:
-                status = "[-]"
-                status_color = "#ff0000"
-            
-            status_label = QLabel(status)
-            status_label.setStyleSheet(f"font-size: 12px; color: {status_color}; font-weight: bold;")
-            frame_layout.addWidget(status_label)
-            
-            # Номер и описание
-            desc = SENSOR_DESCRIPTIONS.get(sensor_id, f"Датчик {sensor_id}")
-            info_label = QLabel(f"Датчик {sensor_id} -- {desc}")
-            info_label.setStyleSheet("font-size: 13px; color: #e0e0e0;")
-            frame_layout.addWidget(info_label, stretch=1)
-            
-            frame.setLayout(frame_layout)
-            self.sensors_layout.addWidget(frame)
-        
-        # Активируем кнопку обработки если есть хотя бы один датчик
-        self.btn_process.setEnabled(len(loaded_ids) > 0)
     
-    def get_loaded_sensors(self) -> Dict[int, dict]:
-        """Возвращает загруженные датчики"""
-        return self._loaded_sensors.copy()
+    def update_sensor_status(self, sensor_id: int, status: str):
+        """Обновить статус датчика."""
+        self.sensor_status[sensor_id] = status
+        if sensor_id in self.buttons:
+            self._update_button_style(self.buttons[sensor_id], sensor_id)
     
-    def _on_back(self):
-        """Обработка нажатия кнопки назад"""
-        if hasattr(self, '_on_back_callback'):
-            self._on_back_callback()
+    def set_all_statuses(self, statuses: Dict[int, str]):
+        """Установить статусы всех датчиков."""
+        self.sensor_status = statuses
+        for sensor_id, btn in self.buttons.items():
+            self._update_button_style(btn, sensor_id)
     
-    def _on_process(self):
-        """Обработка нажатия кнопки обработать"""
-        if hasattr(self, '_on_process_callback'):
-            self._on_process_callback()
+    def _on_sensor_clicked(self, sensor_id: int):
+        self.selected_sensor = sensor_id
+        for sid, btn in self.buttons.items():
+            btn.setChecked(sid == sensor_id)
+            self._update_button_style(btn, sid)
+        self.sensor_selected.emit(sensor_id)
     
-    def set_callbacks(self, on_back=None, on_process=None):
-        """Установка callback функций"""
-        if on_back:
-            self._on_back_callback = on_back
-        if on_process:
-            self._on_process_callback = on_process
+    def set_selected(self, sensor_id: int):
+        if sensor_id in self.buttons:
+            self.buttons[sensor_id].setChecked(True)
+            self._on_sensor_clicked(sensor_id)
+
+
+class Spectrum3DChart(QWidget):
+    """3D спектральный график (дата, Гц, мм/с²)."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(400, 300)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setStyleSheet(f"background-color: {COLOR_BG_DARK}; border: 1px solid {COLOR_BORDER}; border-radius: 4px;")
+        self.data_points = []
+        self.sensor_id = 1
+        self.sensor_name = ""
+    
+    def set_data(self, data_points: List[tuple], sensor_id: int, sensor_name: str):
+        self.data_points = data_points
+        self.sensor_id = sensor_id
+        self.sensor_name = sensor_name
+        self.update()
+    
+    def show_no_data(self, sensor_id: int):
+        self.data_points = []
+        self.sensor_id = sensor_id
+        self.update()
+    
+    def paintEvent(self, event):
+        try:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.fillRect(self.rect(), QColor(COLOR_BG_DARK))
+            
+            if not self.data_points:
+                painter.setPen(QColor(COLOR_TEXT_PRIMARY))
+                painter.setFont(QFont(FONT_FAMILY_MONO, 12, QFont.Weight.Bold))
+                painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Нет данных\nдля датчика {self.sensor_id}')
+                return
+            
+            dates = [p[0] for p in self.data_points]
+            freqs = [p[1] for p in self.data_points]
+            amps = [p[2] for p in self.data_points]
+            
+            min_date, max_date = min(dates), max(dates)
+            min_freq, max_freq = min(freqs), max(freqs)
+            max_amp = max(amps) * 1.1 if amps else 1.0
+            
+            m_left, m_right, m_top, m_bottom = 60, 20, 20, 50
+            w, h = self.width(), self.height()
+            plot_w, plot_h = w - m_left - m_right, h - m_top - m_bottom
+            
+            if plot_w <= 0 or plot_h <= 0: return
+            
+            def date_to_x(dt):
+                total = (max_date - min_date).total_seconds() or 1
+                return m_left + ((dt - min_date).total_seconds() / total) * plot_w
+            
+            def freq_to_y(f):
+                rng = (max_freq - min_freq) or 1
+                return m_top + plot_h - ((f - min_freq) / rng) * plot_h
+            
+            def amp_to_size(a):
+                return max(2, min(10, (a / max_amp) * 10)) if max_amp > 0 else 3
+            
+            painter.setPen(QPen(QColor(COLOR_ACCENT), 2))
+            painter.drawLine(m_left, m_top, m_left, m_top + plot_h)
+            painter.drawLine(m_left, m_top + plot_h, m_left + plot_w, m_top + plot_h)
+            
+            for dt, freq, amp in self.data_points[:500]:  # Оптимизация
+                x, y = date_to_x(dt), freq_to_y(freq)
+                r = amp_to_size(amp)
+                ratio = amp / max_amp if max_amp > 0 else 0.5
+                color = QColor(int(255 * ratio), int(255 * (1 - ratio)), 0)
+                painter.setPen(QPen(color, 1))
+                painter.setBrush(color)
+                painter.drawEllipse(int(x - r/2), int(y - r/2), int(r), int(r))
+            
+            painter.setPen(QColor(COLOR_TEXT_PRIMARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 10, QFont.Weight.Bold))
+            painter.drawText(m_left, 15, f'Датчик {self.sensor_id} — {self.sensor_name}')
+            painter.setPen(QColor(COLOR_TEXT_TERTIARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 8))
+            painter.drawText(w // 2 - 40, h - 10, 'Дата')
+            painter.drawText(5, h // 2, 'Гц')
+        except Exception as e:
+            painter = QPainter(self)
+            painter.setPen(QColor(COLOR_TEXT_PRIMARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 10))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Ошибка:\n{str(e)}')
+
+
+class RecordsChart(QWidget):
+    """2D график количества записей по дням."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(400, 300)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setStyleSheet(f"background-color: {COLOR_BG_DARK}; border: 1px solid {COLOR_BORDER}; border-radius: 4px;")
+        self.records_by_date = {}
+        self.turbine_name = ""
+    
+    def set_data(self, records_by_date: Dict[datetime.date, int], turbine_name: str):
+        self.records_by_date = records_by_date
+        self.turbine_name = turbine_name
+        self.update()
+    
+    def show_no_data(self):
+        self.records_by_date = {}
+        self.update()
+    
+    def paintEvent(self, event):
+        try:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.fillRect(self.rect(), QColor(COLOR_BG_DARK))
+            
+            if not self.records_by_date:
+                painter.setPen(QColor(COLOR_TEXT_PRIMARY))
+                painter.setFont(QFont(FONT_FAMILY_MONO, 12, QFont.Weight.Bold))
+                painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, 'Нет данных\nпо записям')
+                return
+            
+            sorted_dates = sorted(self.records_by_date.keys())
+            counts = [self.records_by_date[d] for d in sorted_dates]
+            min_date, max_date = sorted_dates[0], sorted_dates[-1]
+            max_count = max(counts) * 1.1 if counts else 1.0
+            
+            m_left, m_right, m_top, m_bottom = 60, 20, 20, 50
+            w, h = self.width(), self.height()
+            plot_w, plot_h = w - m_left - m_right, h - m_top - m_bottom
+            bar_width = max(2, plot_w / len(sorted_dates) - 2)
+            
+            def date_to_x(dt):
+                total = (max_date - min_date).days or 1
+                return m_left + ((dt - min_date).days / total) * plot_w
+            
+            def count_to_y(c):
+                return m_top + plot_h - (c / max_count) * plot_h if max_count > 0 else m_top + plot_h
+            
+            painter.setPen(QPen(QColor(COLOR_ACCENT), 2))
+            painter.drawLine(m_left, m_top, m_left, m_top + plot_h)
+            painter.drawLine(m_left, m_top + plot_h, m_left + plot_w, m_top + plot_h)
+            
+            gradient = QLinearGradient(0, m_top, 0, m_top + plot_h)
+            gradient.setColorAt(0, QColor(COLOR_ACCENT))
+            gradient.setColorAt(1, QColor(COLOR_ACCENT_HOVER))
+            
+            for dt in sorted_dates:
+                x = date_to_x(dt) - bar_width / 2
+                y = count_to_y(self.records_by_date[dt])
+                painter.setPen(QPen(COLOR_ACCENT, 1))
+                painter.setBrush(gradient)
+                painter.drawRect(int(x), int(y), int(bar_width), int(m_top + plot_h - y))
+            
+            painter.setPen(QColor(COLOR_TEXT_PRIMARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 10, QFont.Weight.Bold))
+            painter.drawText(m_left, 15, f'Статистика: {self.turbine_name}')
+            painter.setPen(QColor(COLOR_TEXT_TERTIARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 8))
+            painter.drawText(w // 2 - 40, h - 10, 'Дата')
+            painter.drawText(5, h // 2, 'Записей')
+        except Exception as e:
+            painter = QPainter(self)
+            painter.setPen(QColor(COLOR_TEXT_PRIMARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 10))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Ошибка:\n{str(e)}')
