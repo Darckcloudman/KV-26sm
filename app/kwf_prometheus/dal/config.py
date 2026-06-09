@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     """Настройки приложения из .env файла."""
     
     # Версия приложения
-    app_version: str = "1.3"
+    app_version: str = "1.4.1"
     
     # Использование базы данных (true/false)
     use_database: bool = False

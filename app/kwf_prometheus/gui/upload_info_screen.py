@@ -35,7 +35,7 @@ SENSOR_DESCRIPTIONS = {
 class UploadInfoScreen(QWidget):
     """Экран информации о загрузке"""
     
-    def __init__(self, repository: IVibrationRepository = None, parent=None):
+    def __init__(self, repository: Optional[IVibrationRepository] = None, parent=None):
         super().__init__(parent)
         self.repository = repository
         self._loaded_sensors: Dict[int, dict] = {}  # sensor_id -> result
@@ -58,7 +58,7 @@ class UploadInfoScreen(QWidget):
         
         # Заголовок
         title_label = QLabel("ИНФОРМАЦИЯ О ЗАГРУЗКЕ")
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet(f"""
             font-size: 22px;
             font-weight: bold;
@@ -203,7 +203,7 @@ class UploadInfoScreen(QWidget):
         return label
     
     def set_upload_data(self, turbine_name: str, loaded_sensors: Dict[int, dict],
-                       sensor_files: Dict[int, Dict[str, str]] = None,
+                       sensor_files: Optional[Dict[int, Dict[str, str]]] = None,
                        generator_speed: str = "", active_power: str = "", 
                        record_length: str = "", record_number: str = "", record_datetime: str = ""):
         """
@@ -383,9 +383,11 @@ class UploadInfoScreen(QWidget):
         
         # Обновляем список датчиков
         for i in range(self.sensors_layout.count()):
-            widget = self.sensors_layout.itemAt(i).widget()
-            if widget:
-                widget.deleteLater()
+            item = self.sensors_layout.itemAt(i)
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
         
         for sensor_id in range(1, 9):
             frame = QFrame()

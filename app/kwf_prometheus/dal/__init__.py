@@ -2,8 +2,6 @@
 DAL (Data Access Layer) для KWF Prometheus v1.4.1
 
 Слой доступа к данным с поддержкой:
-- Файловая система (.zip/.rd2)
-- PostgreSQL для хранения распарсенных данных
 """
 
 from .config import settings

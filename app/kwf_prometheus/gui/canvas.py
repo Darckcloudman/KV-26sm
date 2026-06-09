@@ -3,9 +3,9 @@
 import numpy as np
 from typing import Optional, Callable
 
-from PyQt5.QtWidgets import QWidget, QSizePolicy
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QPen, QColor, QFont, QBrush
+from PySide6.QtWidgets import QWidget, QSizePolicy
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter, QPen, QColor, QFont, QBrush
 
 
 class MplCanvas(QWidget):
@@ -14,7 +14,7 @@ class MplCanvas(QWidget):
     def __init__(self, parent=None, width=10, height=5, dpi=100):
         super().__init__(parent)
         self.setMinimumSize(400, 250)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet("background-color: #000000;")
 
         self.frequencies = np.array([])
@@ -59,13 +59,13 @@ class MplCanvas(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), QColor('#000000'))
 
         if len(self.frequencies) == 0:
             painter.setPen(QColor('#666666'))
             painter.setFont(QFont('Consolas', 11))
-            painter.drawText(self.rect(), Qt.AlignCenter, 'Загрузите данные для анализа')
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, 'Загрузите данные для анализа')
             return
 
         w, h = self.width(), self.height()
@@ -94,8 +94,8 @@ class MplCanvas(QWidget):
         zone_colors = ['#555555', '#666666', '#777777']
         zone_labels = ['A/B', 'B/C', 'C/D']
         for level, color, label in zip(zone_levels, zone_colors, zone_labels):
-            y = to_y(level)
-            painter.setPen(QPen(QColor(color), 1, Qt.DashLine))
+            y = int(to_y(level))
+            painter.setPen(QPen(QColor(color), 1, Qt.PenStyle.DashLine))
             painter.drawLine(margin, y, w - margin, y)
             painter.setPen(QColor('#888888'))
             painter.setFont(QFont('Consolas', 8))
@@ -109,7 +109,7 @@ class MplCanvas(QWidget):
 
         # Заголовок
         painter.setPen(QColor('#e0e0e0'))
-        painter.setFont(QFont('Consolas', 10, QFont.Bold))
+        painter.setFont(QFont('Consolas', 10, QFont.Weight.Bold))
         painter.drawText(margin, 20, 'Спектр | Зона %s | СКЗ: %.3f мм/с' % (self.zone, self.rms))
 
         # Метки осей

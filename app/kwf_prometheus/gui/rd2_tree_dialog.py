@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QFileSystemModel, QFrame
 )
 from PySide6.QtCore import QDir, QSize, QItemSelectionModel
-import qtawesome as qta
+import qtawesome as qta  # type: ignore[import-untyped]
 from .styled_message_box import show_warning
 
 
@@ -64,7 +64,7 @@ class Rd2TreeDialog(QDialog):
 
         # Separator
         sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
+        sep.setFrameShape(QFrame.Shape.VLine)
         sep.setStyleSheet("color: #333333;")
         sep.setFixedWidth(1)
         nav_layout.addWidget(sep)
@@ -101,13 +101,13 @@ class Rd2TreeDialog(QDialog):
 
         # Tree view with multi-select
         self.tree_view = QTreeView()
-        self.tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.tree_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tree_view.setAlternatingRowColors(False)
         self.tree_view.setAnimated(True)
         self.tree_view.setIndentation(20)
         self.tree_view.setSortingEnabled(True)
         self.tree_view.setHeaderHidden(False)
-        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.tree_view.header().setStretchLastSection(True)
         self.tree_view.setIconSize(QSize(16, 16))
         layout.addWidget(self.tree_view)
@@ -151,7 +151,7 @@ class Rd2TreeDialog(QDialog):
         self.model = QFileSystemModel()
         self.model.setRootPath("")
         # Show dirs + files, hide dot files
-        self.model.setFilter(QDir.AllDirs | QDir.Files | QDir.NoDotAndDotDot | QDir.Hidden)
+        self.model.setFilter(QDir.Filter.AllDirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot | QDir.Filter.Hidden)
         # Show only .rd2 files
         self.model.setNameFilters(["*.rd2"])
         self.model.setNameFilterDisables(False)
@@ -161,9 +161,9 @@ class Rd2TreeDialog(QDialog):
 
         # Show Name, Size, Date Modified; hide Type
         self.tree_view.setColumnHidden(2, True)
-        self.tree_view.header().setSectionResizeMode(0, QHeaderView.Interactive)
-        self.tree_view.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.tree_view.header().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tree_view.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.tree_view.header().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.tree_view.header().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.tree_view.setColumnWidth(0, 350)  # Name column width
 
         # Expand root drives for visibility

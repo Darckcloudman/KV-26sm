@@ -139,7 +139,10 @@ class PostgresRepository(IVibrationRepository):
             # Получаем метаданные прибора
             metadata = parser.turbine_metadata or {}
             wtg_id = metadata.get('wtg_id', 'Unknown')
-            sensor_serial = metadata.get('sensor_serial')  # v1.4: серийный номер датчика
+            # sensor_serial = record_number — порядковый номер записи за сутки.
+            # Все .rd2 файлы одного ZIP-архива имеют одинаковое значение.
+            # Используется только как информационное поле (аудит), НЕ для дедупликации.
+            sensor_serial = metadata.get('sensor_serial')
 
             device_info = {
                 'device': metadata.get('device'),

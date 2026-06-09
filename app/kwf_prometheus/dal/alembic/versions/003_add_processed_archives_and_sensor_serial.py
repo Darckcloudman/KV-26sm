@@ -41,9 +41,13 @@ def upgrade() -> None:
     op.create_index('idx_processed_wtg', 'processed_archives', ['turbine_wtg_id'])
     
     # === Колонка sensor_serial в archives ===
+    # sensor_serial = record_number (первое поле строки 1 .rd2).
+    # Это порядковый номер записи за сутки для ВЭУ. Все .rd2 файлы
+    # внутри одного ZIP-архива имеют ОДИНАКОВОЕ значение.
+    # Используется только как информационное поле (аудит).
     op.add_column(
         'archives',
-        sa.Column('sensor_serial', sa.String(50), nullable=True, comment='Серийный номер датчика (для анализа уникальности, v1.4)')
+        sa.Column('sensor_serial', sa.String(50), nullable=True, comment='Порядковый номер записи за сутки (record_number). Информационное поле, НЕ для дедупликации.')
     )
     op.create_index('idx_archive_sensor_serial', 'archives', ['sensor_serial'])
     

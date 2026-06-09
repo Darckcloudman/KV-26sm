@@ -4,10 +4,15 @@
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import String, DateTime, Index
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .sensor import Sensor
+    from .archive import Archive
 
 
 class Turbine(Base):
@@ -76,6 +81,10 @@ class Turbine(Base):
         Index('idx_turbine_serial', 'serial_number'),
         Index('idx_turbine_mac', 'mac_address'),
     )
+    
+    # Отношения
+    sensors: Mapped[list["Sensor"]] = relationship("Sensor", back_populates="turbine")
+    archives: Mapped[list["Archive"]] = relationship("Archive", back_populates="turbine")
     
     def __repr__(self) -> str:
         return f"<Turbine(id={self.id}, wtg_id='{self.wtg_id}', serial='{self.serial_number}')>"

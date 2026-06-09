@@ -28,97 +28,10 @@ try:
         SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
         Image, PageBreak, KeepTogether
     )
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
     logger.warning("reportlab не установлен. PDF-отчёты недоступны.")
-
-
-# === Глобальная настройка кириллицы ===
-# Используем стандартные шрифты Windows с поддержкой кириллицы
-CYRILLIC_FONT_NAME = 'Helvetica'  # Базовое имя
-CYRILLIC_FONT_BOLD = 'Helvetica-Bold'
-
-def _try_register_cyrillic_fonts():
-    """
-    Попытка зарегистрировать шрифты с поддержкой кириллицы.
-    Используем Arial из Windows или DejaVu Sans как fallback.
-    """
-    global CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD
-    
-    if not HAS_REPORTLAB:
-        logger.error("reportlab не установлен!")
-        return
-    
-    import os
-    import sys
-    
-    logger.info("=== НАЧАЛО РЕГИСТРАЦИИ ШРИФТОВ ===")
-    logger.info("Платформа: %s", sys.platform)
-    
-    # Пуки к шрифтам в порядке приоритета
-    font_candidates = []
-    
-    # Windows - Arial
-    if sys.platform.startswith('win'):
-        logger.info("Обнаружена Windows, используем Arial")
-        font_candidates = [
-            ('Arial', r'C:\Windows\Fonts\arial.ttf'),
-            ('Arial-Bold', r'C:\Windows\Fonts\arialbd.ttf'),
-        ]
-    # macOS
-    elif sys.platform.startswith('darwin'):
-        logger.info("Обнаружена macOS, используем Arial")
-        font_candidates = [
-            ('Arial', '/Library/Fonts/Arial.ttf'),
-            ('Arial-Bold', '/Library/Fonts/Arial Bold.ttf'),
-        ]
-    # Linux
-    else:
-        logger.info("Обнаружена Linux, используем DejaVuSans")
-        font_candidates = [
-            ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
-            ('DejaVuSans-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
-        ]
-
-    # Пробуем зарегистрировать шрифты
-    registered = False
-    for font_name, font_path in font_candidates:
-        logger.info("Проверка шрифта: %s = %s", font_name, font_path)
-        if os.path.exists(font_path):
-            logger.info("Файл шрифта найден: %s", font_path)
-            try:
-                # Регистрируем TrueType шрифт с поддержкой Unicode
-                pdfmetrics.registerFont(TTFont(font_name, font_path))
-                logger.info("[OK] Зарегистрирован шрифт: %s = %s", font_name, font_path)
-                registered = True
-                
-                if font_name.lower().startswith('arial'):
-                    CYRILLIC_FONT_NAME = 'Arial'
-                    CYRILLIC_FONT_BOLD = 'Arial-Bold'
-                elif font_name.lower().startswith('dejavu'):
-                    CYRILLIC_FONT_NAME = 'DejaVuSans'
-                    CYRILLIC_FONT_BOLD = 'DejaVuSans-Bold'
-                    
-            except Exception as e:
-                logger.error("[ERROR] Ошибка регистрации шрифта %s: %s", font_path, e, exc_info=True)
-        else:
-            logger.warning("Файл шрифта НЕ найден: %s", font_path)
-    
-    if not registered:
-        logger.error("[ERROR] Не удалось зарегистрировать ни один шрифт с кириллицей! Используем Helvetica.")
-        CYRILLIC_FONT_NAME = 'Helvetica'
-        CYRILLIC_FONT_BOLD = 'Helvetica-Bold'
-    else:
-        logger.info("=== ЗАВЕРШЕНИЕ РЕГИСТРАЦИИ ШРИФТОВ ===")
-        logger.info("Используемый шрифт: %s (bold: %s)", CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD)
-
-
-# Регистрируем шрифты при загрузке модуля
-if HAS_REPORTLAB:
-    _try_register_cyrillic_fonts()
 
 
 class PDFReportGenerator:
@@ -162,11 +75,7 @@ class PDFReportGenerator:
 
         try:
             file_path = Path(file_path)
-            logger.info("=" * 60)
             logger.info("Генерация PDF-отчёта: %s", file_path)
-            logger.info("Используемые шрифты: %s (bold: %s)", CYRILLIC_FONT_NAME, CYRILLIC_FONT_BOLD)
-            logger.info("Доступные шрифты в reportlab: %s", list(pdfmetrics.getRegisteredFontNames()) if HAS_REPORTLAB else "N/A")
-            logger.info("=" * 60)
 
             doc = SimpleDocTemplate(
                 str(file_path),
@@ -180,11 +89,7 @@ class PDFReportGenerator:
             story = []
             styles = getSampleStyleSheet()
 
-            # Используем зарегистрированные шрифты с кириллицей
-            font_name = CYRILLIC_FONT_NAME
-            font_bold = CYRILLIC_FONT_BOLD
-
-            # Кастомные стили с кириллическим шрифтом
+            # Кастомные стили
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
@@ -192,7 +97,7 @@ class PDFReportGenerator:
                 textColor=self.COLOR_BLACK,
                 spaceAfter=12,
                 alignment=TA_CENTER,
-                fontName=font_bold
+                fontName='Helvetica-Bold'
             )
             heading_style = ParagraphStyle(
                 'CustomHeading',
@@ -201,23 +106,21 @@ class PDFReportGenerator:
                 textColor=self.COLOR_BLACK,
                 spaceAfter=8,
                 spaceBefore=12,
-                fontName=font_bold
+                fontName='Helvetica-Bold'
             )
             normal_style = ParagraphStyle(
                 'CustomNormal',
                 parent=styles['Normal'],
                 fontSize=10,
                 textColor=self.COLOR_BLACK,
-                spaceAfter=6,
-                fontName=font_name
+                spaceAfter=6
             )
             info_style = ParagraphStyle(
                 'CustomInfo',
                 parent=styles['Normal'],
                 fontSize=9,
                 textColor=self.COLOR_GRAY,
-                alignment=TA_RIGHT,
-                fontName=font_name
+                alignment=TA_RIGHT
             )
 
             # === Заголовок ===
@@ -355,23 +258,19 @@ class PDFReportGenerator:
             return f"КРИТИЧНО! Датчик {worst_sensor} показывает значения в зоне D. Требуется немедленная остановка оборудования и проведение аварийного ремонта."
 
     def _styled_table(self, data: List[List[str]], col_widths: List[float]) -> Table:
-        """Создать стилизованную таблицу с поддержкой кириллицы."""
+        """Создать стилизованную таблицу."""
         table = Table(data, colWidths=col_widths, repeatRows=1)
-
-        # Используем зарегистрированные шрифты с кириллицей
-        font_name = CYRILLIC_FONT_NAME
-        font_bold = CYRILLIC_FONT_BOLD
 
         style_commands = [
             ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_BLACK),
             ('TEXTCOLOR', (0, 0), (-1, 0), self.COLOR_WHITE),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), font_bold),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('BACKGROUND', (0, 1), (-1, -1), self.COLOR_WHITE),
             ('TEXTCOLOR', (0, 1), (-1, -1), self.COLOR_BLACK),
-            ('FONTNAME', (0, 1), (-1, -1), font_name),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('GRID', (0, 0), (-1, -1), 0.5, self.COLOR_LIGHT_GRAY),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.COLOR_WHITE, colors.HexColor('#F5F5F5')]),

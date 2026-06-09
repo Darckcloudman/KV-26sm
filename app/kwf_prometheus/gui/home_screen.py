@@ -5,23 +5,10 @@
 Главный экран приложения KWF Prometheus.
 
 Содержит:
-  • Таблицу архивов (.zip / .rd2) с кастомным скроллбаром
-  • Интерактивную схему турбины (shema.png) с 8 датчиками
-  • Плавно мигающие индикаторы статуса (QVariantAnimation)
-  • Список описаний датчиков с текстовым статусом
-
-Статусы индикаторов (SensorIndicator):
-  • empty   — датчик отсутствует в загруженном файле (прозрачный кружок,
-              чёрная рамка 5 px, чёрный номер, без мигания)
-  • ok      — все 3 типа сигналов загружены (зелёная рамка пульсирует
-              плавно, прозрачный центр, чёрный номер)
-  • partial — загружен 1–2 типа сигналов (жёлтая рамка пульсирует
-              плавно, прозрачный центр, чёрный номер)
-  • none    — датчик есть в файле, но данных нет (белая заливка,
-              красная рамка 5 px, белый номер, без мигания)
-
-Координаты SENSOR_POSITIONS зафиксированы вручную под shema.png.
-Изменять только при замене изображения.
+- Таблицу архивов с поиском
+- Схему расположения датчиков
+- Индикаторы статуса
+- Кнопки загрузки
 """
 
 import re
@@ -35,8 +22,8 @@ from PySide6.QtWidgets import (
     QFrame, QSizePolicy, QProgressBar, QAbstractItemView, QTreeView,
     QDialog, QLineEdit, QCheckBox
 )
-from PySide6.QtCore import Qt, QThread, Signal, QRect, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer, QPropertyAnimation
-from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette
+from PySide6.QtCore import Qt, QThread, Signal, QRect, QPointF, QVariantAnimation, QEasingCurve, QAbstractAnimation, QTimer
+from PySide6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPixmap, QPalette, QConicalGradient
 
 
 class LoadingSpinner(QWidget):
@@ -53,7 +40,7 @@ class LoadingSpinner(QWidget):
         self._animation.setDuration(1000)  # 1 секунда на оборот (плавнее)
         self._animation.setStartValue(0)
         self._animation.setEndValue(360)
-        self._animation.setEasingCurve(QEasingCurve.Linear)  # Плавное линейное вращение
+        self._animation.setEasingCurve(QEasingCurve.Type.Linear)  # Плавное линейное вращение
         self._animation.setLoopCount(-1)  # Бесконечно
         self._animation.valueChanged.connect(self._on_angle_changed)
         
@@ -79,7 +66,7 @@ class LoadingSpinner(QWidget):
     def paintEvent(self, event):
         """Отрисовка крутящегося индикатора."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if not self._is_spinning:
             return
@@ -102,6 +89,48 @@ class LoadingSpinner(QWidget):
         
         painter.resetTransform()
 
+class PulseRedDot(QWidget):
+    """Пульсирующая красная точка — индикатор точки подключения.
+
+    Кружок растёт из центра (диаметр 4→12 px) и плавно исчезает.
+    Анимация бесконечная, запускается автоматически при создании.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(30, 30)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._progress = 0.0
+
+        self._animation = QVariantAnimation(self)
+        self._animation.setDuration(1000)
+        self._animation.setStartValue(0.0)
+        self._animation.setEndValue(1.0)
+        self._animation.setLoopCount(-1)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self._animation.valueChanged.connect(self._on_value_changed)
+        self._animation.start()
+
+    def _on_value_changed(self, value):
+        self._progress = float(value)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        min_radius = 2.0   # диаметр 4 px
+        max_radius = 6.0   # диаметр 12 px
+        current_radius = min_radius + (max_radius - min_radius) * self._progress
+        opacity = 1.0 - self._progress
+
+        center = QPointF(self.width() / 2, self.height() / 2)
+        painter.setOpacity(opacity)
+        painter.setBrush(QBrush(QColor(255, 59, 59)))   # ярко-красный
+        painter.setPen(Qt.PenStyle.NoPen)               # без обводки
+        painter.drawEllipse(center, current_radius, current_radius)
+
+
 from ..parsers.rd2_parser import MultiSensorRD2Parser, RD2Parser
 from ..dal.repositories.base import IVibrationRepository
 from ..dal.logger import get_logger
@@ -110,6 +139,7 @@ from .directory_tree_dialog import DirectoryTreeDialog
 from .archive_tree_dialog import ArchiveTreeDialog
 from .rd2_tree_dialog import Rd2TreeDialog
 from .styled_message_box import show_critical, show_warning, show_info
+from .ui_styles import CHECKBOX_STYLE
 
 logger = get_logger("HomeScreen")
 
@@ -128,14 +158,27 @@ SENSOR_DESCRIPTIONS = [
 # Координаты датчиков на shema.png — подогнаны вручную и зафиксированы.
 # Изменять только при замене изображения shema.png!
 SENSOR_POSITIONS = [
-    (0.102, 0.698),   # 1 - нижний левый
-    (0.472, 0.918),   # 2 - нижний центр-лево
-    (0.505, 0.647),   # 3 - нижний центр
-    (0.894, 0.87),    # 4 - правый нижний
-    (0.833, 0.62),    # 5 - правый средний
-    (0.182, 0.32),    # 6 - верхний левый
+    (0.105, 0.696),   # 1 - нижний левый
+    (0.470, 0.912),   # 2 - нижний центр-лево
+    (0.505, 0.644),   # 3 - нижний центр
+    (0.890, 0.865),    # 4 - правый нижний
+    (0.833, 0.615),    # 5 - правый средний
+    (0.182, 0.318),    # 6 - верхний левый
     (0.047, 0.304),   # 7 - верхний центр
-    (0.881, 0.378),   # 8 - верхний правый (отдельный круг)
+    (0.884, 0.376),   # 8 - верхний правый (отдельный круг)
+]
+
+# Координаты красных точек подключения на shema.png — относительные (0.0–1.0).
+
+CONNECTION_POSITIONS = [
+    (0.150, 0.745),   # 1 — точка подключения датчика 1
+    (0.413, 0.784),   # 2
+    (0.566, 0.664),   # 3
+    (0.844, 0.874),   # 4
+    (0.876, 0.581),   # 5
+    (0.131, 0.352),   # 6
+    (0.102, 0.348),   # 7
+    (0.819, 0.307),   # 8
 ]
 
 
@@ -184,7 +227,7 @@ class ParseThread(QThread):
                     load_result = loop.run_until_complete(
                         self.repository.load_archive(Path(self.file_path))
                     )
-                
+
                 if self._is_cancelled:
                     return
                 
@@ -228,13 +271,13 @@ class SensorIndicator(QWidget):
         self.selected = False
         self._glow = 1.0
         self.setFixedSize(26, 26)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self._animation = QVariantAnimation(self)
         self._animation.setStartValue(0.0)
         self._animation.setEndValue(1.0)
         self._animation.setDuration(1200)
-        self._animation.setEasingCurve(QEasingCurve.InOutSine)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutSine)
         self._animation.valueChanged.connect(self._on_glow_changed)
         self._animation.finished.connect(self._on_animation_finished)
 
@@ -243,10 +286,10 @@ class SensorIndicator(QWidget):
         self.update()
 
     def _on_animation_finished(self):
-        if self._animation.direction() == QAbstractAnimation.Forward:
-            self._animation.setDirection(QAbstractAnimation.Backward)
+        if self._animation.direction() == QAbstractAnimation.Direction.Forward:
+            self._animation.setDirection(QAbstractAnimation.Direction.Backward)
         else:
-            self._animation.setDirection(QAbstractAnimation.Forward)
+            self._animation.setDirection(QAbstractAnimation.Direction.Forward)
         self._animation.start()
 
     @staticmethod
@@ -265,7 +308,7 @@ class SensorIndicator(QWidget):
         """
         self.status = status
         if status in ('ok', 'partial'):
-            if self._animation.state() != QAbstractAnimation.Running:
+            if self._animation.state() != QAbstractAnimation.State.Running:
                 self._animation.start()
         else:
             self._animation.stop()
@@ -286,12 +329,12 @@ class SensorIndicator(QWidget):
           none    → красная рамка, белый центр, белый номер
         """
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = 11
         cx, cy = 13, 13
 
         if self.status == 'empty':
-            border_color = QColor("#000000")
+            border_color = QColor("#FFFFFF")
             fill_brush = QBrush(QColor("#FFFFFF"))
             text_color = QColor("#000000")
         elif self.status == 'ok':
@@ -316,14 +359,14 @@ class SensorIndicator(QWidget):
         painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
 
         painter.setPen(QPen(text_color))
-        font = QFont("Arial", 9, QFont.Bold)
+        font = QFont("Arial", 9, QFont.Weight.Bold)
         painter.setFont(font)
         text_rect = QRect(cx - r, cy - r, r * 2, r * 2)
-        painter.drawText(text_rect, Qt.AlignCenter, str(self.sensor_id))
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, str(self.sensor_id))
 
         if self.selected:
             painter.setPen(QPen(QColor("#FFFFFF"), 2))
-            painter.setBrush(Qt.NoBrush)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(cx - r - 2, cy - r - 2, (r + 2) * 2, (r + 2) * 2)
 
     def mousePressEvent(self, event):
@@ -336,13 +379,14 @@ class SensorScheme(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(650, 442)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumSize(900, 600)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet("background-color: #000000; border: none;")
 
         self._pixmap = None
         self._scaled_pixmap = None
         self._indicators = []
+        self._connection_dots = []
         self._pixmap_x = 0
         self._pixmap_y = 0
         self._scale = 1.0
@@ -358,12 +402,18 @@ class SensorScheme(QFrame):
                 self._pixmap = QPixmap(str(p))
                 break
 
-        # Создаём индикаторы
+        # Создаём индикаторы датчиков
         for i in range(8):
             indicator = SensorIndicator(i + 1, self)
             indicator.clicked.connect(self.sensor_clicked.emit)
             self._indicators.append(indicator)
             indicator.show()
+
+        # Создаём точки подключения (пульсирующие красные кружки)
+        for _ in range(8):
+            dot = PulseRedDot(self)
+            self._connection_dots.append(dot)
+            dot.show()
 
     def set_sensor_status(self, sensor_id, status):
         if 1 <= sensor_id <= 8:
@@ -386,7 +436,7 @@ class SensorScheme(QFrame):
             return
 
         w, h = self.width(), self.height()
-        self._scaled_pixmap = self._pixmap.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self._scaled_pixmap = self._pixmap.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._pixmap_x = (w - self._scaled_pixmap.width()) // 2
         self._pixmap_y = (h - self._scaled_pixmap.height()) // 2
         self._scale = self._scaled_pixmap.width() / self._pixmap.width()
@@ -396,6 +446,14 @@ class SensorScheme(QFrame):
             x = self._pixmap_x + int(rel_x * self._pixmap.width() * self._scale) - 13
             y = self._pixmap_y + int(rel_y * self._pixmap.height() * self._scale) - 13
             ind.move(x, y)
+
+        # Позиционируем точки подключения (центр точки = координата)
+        for i, (rel_x, rel_y) in enumerate(CONNECTION_POSITIONS):
+            dot = self._connection_dots[i]
+            x = self._pixmap_x + int(rel_x * self._pixmap.width() * self._scale) - 15
+            y = self._pixmap_y + int(rel_y * self._pixmap.height() * self._scale) - 15
+            dot.move(x, y)
+            dot.raise_()  # гарантируем, что точки поверх схемы и индикаторов
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -444,17 +502,11 @@ class HomeScreen(QWidget):
         # Запускаем автопарсинг если доступен
         if self.auto_scan_service is not None:
             self.auto_scan_service.start_timer(self)
-            self.auto_scan_service.start_scan(
-                on_progress=self._on_scan_progress,
-                on_archive=self._on_scan_archive,
-                on_finished=self._on_scan_finished,
-                on_error=self._on_scan_error
-            )
 
     def _setup_ui(self):
         # Чёрный фон через палитру
         palette = self.palette()
-        palette.setColor(QPalette.Window, QColor("#000000"))
+        palette.setColor(QPalette.ColorRole.Window, QColor("#000000"))
         self.setAutoFillBackground(True)
         self.setPalette(palette)
 
@@ -465,15 +517,18 @@ class HomeScreen(QWidget):
         # Заголовок
         title = QLabel("KWF Prometheus")
         title.setStyleSheet("color: #FFFFFF; font-size: 22px; font-weight: bold; background: transparent;")
-        title.setAlignment(Qt.AlignCenter)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title)
 
-        # Кнопки + путь
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(16)
+        # Основной контент: левая колонка (кнопки + таблица) | правая колонка (схема + статусы)
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(16)
 
-        left_top = QVBoxLayout()
-        left_top.setSpacing(8)
+        # --- Левая колонка ---
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(20)
 
         btn_style = """
             QPushButton {
@@ -493,60 +548,17 @@ class HomeScreen(QWidget):
         self.load_rd2_btn = QPushButton("Загрузить файл .rd2")
         self.load_rd2_btn.setStyleSheet(btn_style)
         self.load_rd2_btn.clicked.connect(self._load_rd2_file)
-        left_top.addWidget(self.load_rd2_btn)
+        left_layout.addWidget(self.load_rd2_btn)
 
         self.load_btn = QPushButton("Загрузить архив .zip")
         self.load_btn.setStyleSheet(btn_style)
         self.load_btn.clicked.connect(self._load_archive)
-        left_top.addWidget(self.load_btn)
+        left_layout.addWidget(self.load_btn)
 
         self.dir_btn = QPushButton("Выбрать место хранения архивов")
         self.dir_btn.setStyleSheet(btn_style)
         self.dir_btn.clicked.connect(self._select_directory)
-        left_top.addWidget(self.dir_btn)
-
-        # --- Автопарсинг (v1.4) ---
-        self.auto_scan_checkbox = QCheckBox("Автоматически импортировать новые архивы")
-        self.auto_scan_checkbox.setStyleSheet("color: #BBBBBB; font-size: 10px; background: transparent;")
-        self.auto_scan_checkbox.setChecked(self.auto_scan_service is not None and self.auto_scan_service.enabled)
-        self.auto_scan_checkbox.stateChanged.connect(self._on_auto_scan_toggled)
-        left_top.addWidget(self.auto_scan_checkbox)
-        
-        self.scan_now_btn = QPushButton("Сканировать хранилище")
-        self.scan_now_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #333333;
-                color: #FFFFFF;
-                font-size: 11px;
-                padding: 6px 16px;
-                border: 1px solid #555555;
-                border-radius: 2px;
-                min-width: 190px;
-                text-align: left;
-            }
-            QPushButton:hover { background-color: #444444; }
-            QPushButton:pressed { background-color: #555555; }
-            QPushButton:disabled { background-color: #222222; color: #666666; }
-        """)
-        self.scan_now_btn.clicked.connect(self._start_manual_scan)
-        self.scan_now_btn.setEnabled(self.auto_scan_service is not None)
-        left_top.addWidget(self.scan_now_btn)
-        
-        self.scan_status_label = QLabel("")
-        self.scan_status_label.setStyleSheet("color: #888888; font-size: 9px; background: transparent;")
-        self.scan_status_label.setWordWrap(True)
-        left_top.addWidget(self.scan_status_label)
-        # --- Конец автопарсинга ---
-        
-        left_top.addStretch()
-
-        top_layout.addLayout(left_top, 0)
-        top_layout.addStretch(1)
-        main_layout.addLayout(top_layout)
-
-        # Таблица + Схема
-        middle_layout = QHBoxLayout()
-        middle_layout.setSpacing(4)
+        left_layout.addWidget(self.dir_btn)
 
         # Таблица
         table_frame = QFrame()
@@ -594,10 +606,10 @@ class HomeScreen(QWidget):
         self.archive_table = QTableWidget()
         self.archive_table.setColumnCount(3)  # WTG, Дата, Размер
         self.archive_table.setHorizontalHeaderLabels(["WTG", "Дата записи", "Размер"])
-        self.archive_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.archive_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.archive_table.verticalHeader().setVisible(False)
-        self.archive_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.archive_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.archive_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.archive_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.archive_table.setMinimumWidth(300)
         self.archive_table.setMaximumWidth(600)
         self.archive_table.setStyleSheet("""
@@ -673,23 +685,24 @@ class HomeScreen(QWidget):
         self.archive_table.itemSelectionChanged.connect(self._on_archive_selected)
         table_layout.addWidget(self.archive_table)
 
-        middle_layout.addWidget(table_frame, 0)
+        left_layout.addWidget(table_frame, 1)
+        content_layout.addWidget(left_panel, 0)
 
-        # Правая панель: схема сверху + статусы снизу
+        # --- Правая колонка: схема + статусы ---
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(35, 0, 0, 0)
         right_layout.setSpacing(8)
 
-        # Схема — прижата влево (ближе к таблице), по верху
+        # Схема
         scheme_wrapper = QHBoxLayout()
         self.scheme = SensorScheme()
         self.scheme.sensor_clicked.connect(self._on_sensor_clicked)
-        scheme_wrapper.addWidget(self.scheme, alignment=Qt.AlignTop)
+        scheme_wrapper.addWidget(self.scheme, alignment=Qt.AlignmentFlag.AlignTop)
         scheme_wrapper.addStretch()
-        right_layout.addLayout(scheme_wrapper, 2)
+        right_layout.addLayout(scheme_wrapper, 0)
 
-        # Список статусов — прижаты влево (ближе к таблице) и к верху
+        # Список статусов
         status_wrapper = QHBoxLayout()
         status_frame = QFrame()
         status_frame.setStyleSheet("QFrame { background-color: #000000; border: 0px; border-radius: 0px; }")
@@ -697,43 +710,76 @@ class HomeScreen(QWidget):
         status_layout.setContentsMargins(0, 0, 0, 0)
         status_layout.setHorizontalSpacing(8)
         status_layout.setVerticalSpacing(4)
-        status_layout.setColumnStretch(1, 1)   # Описание растягивается
-        status_layout.setColumnStretch(2, 0)   # Статус — фиксированная ширина
+        status_layout.setColumnStretch(1, 1)
+        status_layout.setColumnStretch(2, 0)
 
         self.status_labels = {}
-        for i, desc in enumerate(SENSOR_DESCRIPTIONS):
+        row = 0
+        
+        # Заголовок группы: Редуктор (датчики 1-5)
+        gearbox_header = QLabel('РЕДУКТОР')
+        gearbox_header.setStyleSheet("color: #888888; font-size: 10px; font-weight: bold; background: transparent;")
+        status_layout.addWidget(gearbox_header, row, 0, 1, 3, alignment=Qt.AlignmentFlag.AlignTop)
+        row += 1
+        
+        for i, desc in enumerate(SENSOR_DESCRIPTIONS[:5]):  # Датчики 1-5
             sensor_id = i + 1
 
             num_label = QLabel(f"{sensor_id}.")
             num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
-            status_layout.addWidget(num_label, i, 0, alignment=Qt.AlignTop)
+            status_layout.addWidget(num_label, row, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
             desc_label = QLabel(desc)
             desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
-            status_layout.addWidget(desc_label, i, 1, alignment=Qt.AlignTop)
+            status_layout.addWidget(desc_label, row, 1, alignment=Qt.AlignmentFlag.AlignTop)
 
             status_label = QLabel("[нет данных]")
             status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
-            status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            status_layout.addWidget(status_label, i, 2, alignment=Qt.AlignTop)
+            status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            status_layout.addWidget(status_label, row, 2, alignment=Qt.AlignmentFlag.AlignTop)
 
             self.status_labels[sensor_id] = status_label
+            row += 1
+
+        # Заголовок группы: Генератор (датчики 6-8)
+        generator_header = QLabel('ГЕНЕРАТОР')
+        generator_header.setStyleSheet("color: #888888; font-size: 10px; font-weight: bold; background: transparent;")
+        status_layout.addWidget(generator_header, row, 0, 1, 3, alignment=Qt.AlignmentFlag.AlignTop)
+        row += 1
+        
+        for i, desc in enumerate(SENSOR_DESCRIPTIONS[5:8]):  # Датчики 6-8
+            sensor_id = i + 6
+
+            num_label = QLabel(f"{sensor_id}.")
+            num_label.setStyleSheet("color: #FFFFFF; font-size: 11px; background: transparent; min-width: 18px;")
+            status_layout.addWidget(num_label, row, 0, alignment=Qt.AlignmentFlag.AlignTop)
+
+            desc_label = QLabel(desc)
+            desc_label.setStyleSheet("color: #BBBBBB; font-size: 11px; background: transparent;")
+            status_layout.addWidget(desc_label, row, 1, alignment=Qt.AlignmentFlag.AlignTop)
+
+            status_label = QLabel("[нет данных]")
+            status_label.setStyleSheet("color: #F44336; font-size: 11px; font-weight: bold; background: transparent;")
+            status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            status_layout.addWidget(status_label, row, 2, alignment=Qt.AlignmentFlag.AlignTop)
+
+            self.status_labels[sensor_id] = status_label
+            row += 1
 
         status_frame.setMaximumWidth(650)
         status_wrapper.addWidget(status_frame)
         status_wrapper.addStretch()
         
-        # Контейнер для выравнивания статусов по верху
         status_container = QWidget()
         status_container.setLayout(status_wrapper)
-        right_layout.addWidget(status_container, 0, Qt.AlignTop)
-        right_layout.addStretch()  # всё лишнее пространство снизу
+        right_layout.addWidget(status_container, 0, Qt.AlignmentFlag.AlignTop)
+        # Убрали addStretch() — панель минимальной высоты
 
-        middle_layout.addWidget(right_panel, 1)
-        main_layout.addLayout(middle_layout, 2)
+        content_layout.addWidget(right_panel, 1, Qt.AlignmentFlag.AlignTop)
+        main_layout.addLayout(content_layout, 2)
 
         # Кнопка анализа
-        self.analyze_btn = QPushButton("Проанализировать")
+        self.analyze_btn = QPushButton("Обработать")
         self.analyze_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FFFFFF;
@@ -749,12 +795,12 @@ class HomeScreen(QWidget):
         """)
         self.analyze_btn.setEnabled(False)
         self.analyze_btn.clicked.connect(self._analyze)
-        main_layout.addWidget(self.analyze_btn, alignment=Qt.AlignCenter)
+        main_layout.addWidget(self.analyze_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Версия и режим работы
         version_label = QLabel("v1.4.1 | A.Telezhenko, 2026")
         version_label.setStyleSheet("color: #444444; font-size: 9px; background: transparent;")
-        version_label.setAlignment(Qt.AlignCenter)
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(version_label)
 
         # Индикатор режима хранения (добавлено в v1.3)
@@ -762,20 +808,21 @@ class HomeScreen(QWidget):
         mode_text = "PostgreSQL" if settings.use_database else "Файловая система"
         mode_label = QLabel(f"Режим хранения данных: {mode_text}")
         mode_label.setStyleSheet("color: #555555; font-size: 9px; background: transparent;")
-        mode_label.setAlignment(Qt.AlignCenter)
+        mode_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(mode_label)
 
+    def set_repository(self, repository):
+        """Установить новый репозиторий (при динамическом переключении)."""
+        self.repository = repository
+        
     def _select_directory(self):
         """Выбрать каталог с архивами и сохранить путь."""
         try:
             dialog = DirectoryTreeDialog(self, str(self.archive_dir))
-            if dialog.exec() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 selected_dir = dialog.get_selected_directory()
                 if selected_dir:
                     self.archive_dir = Path(selected_dir)
-                    self.path_label.setText(
-                        f"Путь к месту хранения архивов:\n{self.archive_dir}"
-                    )
                     set_last_archive_dir(self.archive_dir)
                     self._scan_archives()
         except Exception as e:
@@ -783,6 +830,38 @@ class HomeScreen(QWidget):
                 self, "Ошибка", f"Не удалось открыть диалог:\n{str(e)}"
             )
             
+    def add_archives(self, archives: list):
+        """Добавить архивы в таблицу (из сканирования настроек).
+        
+        Args:
+            archives: Список словарей с ключами turbine, date_str, size, path, filename
+        """
+        if not archives:
+            return
+
+        # Добавляем новые архивы, избегая дубликатов по пути
+        existing_paths = {a['path'] for a in self._all_archives}
+        added_count = 0
+        
+        for archive in archives:
+            if archive['path'] not in existing_paths:
+                self._all_archives.append(archive)
+                existing_paths.add(archive['path'])
+                added_count += 1
+        
+        # Сортируем по имени файла
+        self._all_archives.sort(key=lambda a: a['filename'])
+        
+        # Обновляем отображение с текущим фильтром
+        self._apply_filter(self.search_input.text())
+        
+        # Устанавливаем директорию из первого архива если ещё не задана
+        if archives and not self.archive_dir.exists():
+            first_path = Path(archives[0]['path']).parent
+            if first_path.exists():
+                self.archive_dir = first_path
+                set_last_archive_dir(first_path)
+
     def _scan_archives(self):
         """Сканировать каталог и заполнить таблицу архивами (.zip)."""
         try:
@@ -841,8 +920,8 @@ class HomeScreen(QWidget):
             # Ничего не найдено
             self.archive_table.insertRow(0)
             no_result = QTableWidgetItem("Ничего не найдено")
-            no_result.setFlags(Qt.ItemIsEnabled)
-            no_result.setTextAlignment(Qt.AlignCenter)
+            no_result.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            no_result.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             no_result.setForeground(QColor("#888888"))
             self.archive_table.setItem(0, 0, no_result)
             self.archive_table.setSpan(0, 0, 1, 3)
@@ -851,7 +930,7 @@ class HomeScreen(QWidget):
         for row_idx, archive in enumerate(filtered):
             self.archive_table.insertRow(row_idx)
             item0 = QTableWidgetItem(archive['turbine'])
-            item0.setData(Qt.UserRole, archive['path'])
+            item0.setData(Qt.ItemDataRole.UserRole, archive['path'])
             self.archive_table.setItem(row_idx, 0, item0)
             self.archive_table.setItem(row_idx, 1, QTableWidgetItem(archive['date_str']))
             self.archive_table.setItem(row_idx, 2, QTableWidgetItem(archive['size']))
@@ -900,7 +979,7 @@ class HomeScreen(QWidget):
         item = self.archive_table.item(row, 0)
         if item is None:
             return
-        file_path = item.data(Qt.UserRole)
+        file_path = item.data(Qt.ItemDataRole.UserRole)
         if file_path and Path(file_path).exists():
             self._parse_archive(file_path)
 
@@ -908,7 +987,7 @@ class HomeScreen(QWidget):
         """Открыть кастомный диалог выбора .rd2 файлов (мультивыбор)."""
         try:
             dialog = Rd2TreeDialog(self, str(self.archive_dir))
-            if dialog.exec() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 files = dialog.get_selected_files()
                 if files:
                     # Передаём первый файл или все файлы на обработку
@@ -920,7 +999,7 @@ class HomeScreen(QWidget):
         """Открыть кастомный диалог выбора .zip архива."""
         try:
             dialog = ArchiveTreeDialog(self, str(self.archive_dir))
-            if dialog.exec() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 file_path = dialog.get_selected_file()
                 if file_path:
                     self._parse_archive(file_path)
@@ -1018,81 +1097,6 @@ class HomeScreen(QWidget):
         self.parse_thread.load_result.connect(self._on_load_result)  # Новый сигнал
         self.parse_thread.start()
 
-    # === Автопарсинг (v1.4) ===
-    
-    def _on_auto_scan_toggled(self, state):
-        """Включить/выключить автопарсинг."""
-        if self.auto_scan_service is not None:
-            self.auto_scan_service.enabled = (state == Qt.Checked)
-            if self.auto_scan_service.enabled:
-                self.auto_scan_service.start_timer(self)
-            else:
-                self.auto_scan_service.stop_timer()
-    
-    def _start_manual_scan(self):
-        """Запустить ручное сканирование хранилища."""
-        if self.auto_scan_service is None:
-            show_warning(self, "Автопарсинг недоступен", 
-                        "Сервис автопарсинга не инициализирован. "
-                        "Проверьте настройки подключения к БД.")
-            return
-        
-        if self.auto_scan_service.is_running():
-            show_info(self, "Сканирование", "Сканирование уже выполняется.")
-            return
-        
-        self.scan_now_btn.setEnabled(False)
-        self.scan_now_btn.setText("Сканирование...")
-        self.scan_status_label.setText("Сканирование запущено...")
-        
-        self.auto_scan_service.start_scan(
-            on_progress=self._on_scan_progress,
-            on_archive=self._on_scan_archive,
-            on_finished=self._on_scan_finished,
-            on_error=self._on_scan_error
-        )
-    
-    def _on_scan_progress(self, found, processed, skipped, total):
-        """Обновление прогресса сканирования."""
-        self.scan_status_label.setText(
-            f"Найдено: {found}, обработано: {processed}, "
-            f"пропущено: {skipped}"
-        )
-    
-    def _on_scan_archive(self, name, added, skipped):
-        """Обработан один архив."""
-        logger.debug("Автопарсинг: %s — добавлено %d, пропущено %d", name, added, skipped)
-    
-    def _on_scan_finished(self, result):
-        """Сканирование завершено."""
-        self.scan_now_btn.setEnabled(True)
-        self.scan_now_btn.setText("Сканировать хранилище")
-        
-        if result.processed > 0:
-            self.scan_status_label.setText(
-                f"Готово: обработано {result.processed} архивов, "
-                f"добавлено {result.added_records} записей"
-            )
-            # Показываем статусное сообщение в главном окне
-            from .main_window import MainWindow
-            main_win = self.window()
-            if isinstance(main_win, MainWindow):
-                main_win.show_status_message(
-                    f"Автопарсинг: добавлено {result.added_records} записей из {result.processed} архивов",
-                    "mdi.check-circle"
-                )
-        else:
-            self.scan_status_label.setText("Новых архивов не найдено")
-    
-    def _on_scan_error(self, error_msg):
-        """Ошибка сканирования."""
-        self.scan_now_btn.setEnabled(True)
-        self.scan_now_btn.setText("Сканировать хранилище")
-        self.scan_status_label.setText(f"Ошибка: {error_msg}")
-        logger.error("Ошибка автопарсинга: %s", error_msg)
-
-    # === Конец автопарсинга ===
-
     def _on_load_result(self, result: Dict):
         """Обработчик результатов загрузки (дедупликация)."""
         # Сохраняем для использования в _on_parse_finished
@@ -1137,32 +1141,11 @@ class HomeScreen(QWidget):
         self._update_sensor_statuses()
         self.analyze_btn.setEnabled(True)
 
-        # Показываем результаты дедупликации
-        result = getattr(self, '_last_load_result', {})
-        added = result.get('added', 0)
-        skipped = result.get('skipped', 0)
-        
-        if added > 0 or skipped > 0:
-            # Показываем уведомление в статус-баре главного окна
-            from .main_window import MainWindow
-            main_win = self.window()
-            if isinstance(main_win, MainWindow):
-                if skipped > 0:
-                    main_win.show_status_message(
-                        f"Загружено: {added} новых, пропущено: {skipped} дубликатов",
-                        "mdi.info"
-                    )
-                else:
-                    main_win.show_status_message(
-                        f"Загружено {added} новых записей",
-                        "mdi.check-circle"
-                    )
-
     def _on_parse_error(self, error_msg):
         """Обработчик ошибки загрузки."""
         self._hide_loading_spinner()
         self._is_loading = False
-        
+
         # Разблокируем таблицу и кнопки
         self.archive_table.setEnabled(True)
         self.load_btn.setEnabled(True)
@@ -1182,9 +1165,10 @@ class HomeScreen(QWidget):
             self._loading_spinner.start()
             
             # Позиционируем спиннер справа от таблицы
-            rect = self.archive_table.visualItemRect(
-                self.archive_table.item(row, 2)  # Колонка 2 = "Размер"
-            )
+            item = self.archive_table.item(row, 2)  # Колонка 2 = "Размер"
+            if item is None:
+                return
+            rect = self.archive_table.visualItemRect(item)
             
             # Конвертируем координаты из таблицы в глобальные, затем в локальные HomeScreen
             table_pos = self.archive_table.mapToGlobal(rect.topLeft())

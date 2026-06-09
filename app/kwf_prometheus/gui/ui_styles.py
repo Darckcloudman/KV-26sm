@@ -3,8 +3,10 @@
 Единая система стилей UI для KWF Prometheus v1.4.1
 
 Основана на чёрно-белой минималистичной теме HomeScreen.
-Все экраны должны использовать эти стили для консистентности.
 """
+
+import base64
+import os
 
 # === ЦВЕТОВАЯ ПАЛИТРА ===
 
@@ -335,6 +337,60 @@ STATUSBAR_ICON_STYLE = f"""
         color: {COLOR_TEXT_SECONDARY};
         font-size: 14px;
         padding: 0px 4px;
+    }}
+"""
+
+# Чек-боксы (светлый фон, зелёная галочка PNG)
+_CHECKBOX_CHECKED_PATH = os.path.join(os.path.dirname(__file__), 'checkbox_checked.png').replace('\\', '/')
+
+CHECKBOX_STYLE = f"""
+    QCheckBox {{
+        font-size: 11px;
+        color: {COLOR_TEXT_PRIMARY};
+        spacing: 6px;
+    }}
+    QCheckBox::indicator {{
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+    }}
+    QCheckBox::indicator:unchecked {{
+        background-color: #3A3A3A;
+        border: 1.5px solid #5A5A5A;
+    }}
+    QCheckBox::indicator:checked {{
+        background-color: #FFFFFF;
+        border: 1.5px solid #FFFFFF;
+        image: url({_CHECKBOX_CHECKED_PATH!r});
+    }}
+    QCheckBox::indicator:hover:unchecked {{
+        background-color: #4A4A4A;
+        border-color: #7A7A7A;
+    }}
+    QCheckBox::indicator:hover:checked {{
+        background-color: #FFFFFF;
+        border-color: #FFFFFF;
+    }}
+    QCheckBox::indicator:disabled {{
+        background-color: #2A2A2A;
+        border-color: #444444;
+    }}
+    QCheckBox:focus {{
+        outline: none;
+    }}
+"""
+
+# Лог-поле (QTextEdit для вывода логов сканирования)
+LOG_TEXT_STYLE = f"""
+    QTextEdit, QPlainTextEdit {{
+        background-color: #0A0A0A;
+        color: #CCCCCC;
+        border: 1px solid {COLOR_BORDER};
+        border-radius: 4px;
+        padding: 8px;
+        font-family: {FONT_FAMILY_MONO};
+        font-size: 10px;
+        line-height: 1.4;
     }}
 """
 

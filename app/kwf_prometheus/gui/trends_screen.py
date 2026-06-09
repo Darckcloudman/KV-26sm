@@ -23,6 +23,7 @@ import pyqtgraph as pg
 from ..dal.repositories.base import IVibrationRepository
 from ..dal.config import settings
 from ..dal.logger import get_logger
+from .ui_styles import CHECKBOX_STYLE
 from .workers.trends_worker import TrendsWorker
 from .styled_message_box import show_critical, show_info
 from .ui_styles import (
@@ -57,7 +58,7 @@ class TurbinesLoaderThread(QThread):
 class TrendsScreen(QWidget):
     """Вкладка для анализа трендов вибрации."""
 
-    def __init__(self, repository: IVibrationRepository, parent=None):
+    def __init__(self, repository: Optional[IVibrationRepository] = None, parent=None):
         super().__init__(parent)
         self.repository = repository
         self._turbines: List[Dict[str, Any]] = []
@@ -98,7 +99,7 @@ class TrendsScreen(QWidget):
             border: 1px solid {COLOR_BORDER};
             border-radius: 5px;
         """)
-        self.file_mode_warning.setAlignment(Qt.AlignCenter)
+        self.file_mode_warning.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.file_mode_warning.setVisible(not settings.use_database)
         main_layout.addWidget(self.file_mode_warning)
 
@@ -135,7 +136,7 @@ class TrendsScreen(QWidget):
 
         # Среднее по ветропарку
         self.avg_park_checkbox = QCheckBox("Среднее по ветропарку")
-        self.avg_park_checkbox.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 11px;")
+        self.avg_park_checkbox.setStyleSheet(CHECKBOX_STYLE)
         self.avg_park_checkbox.stateChanged.connect(self._on_avg_park_changed)
         control_layout.addWidget(self.avg_park_checkbox)
 
@@ -230,7 +231,7 @@ class TrendsScreen(QWidget):
 
         # Кривая тренда
         self.plot_curve = self.plot_widget.plot(
-            pen=pg.mkPen(color=COLOR_ACCENT, width=2, style=Qt.SolidLine),
+            pen=pg.mkPen(color=COLOR_ACCENT, width=2, style=Qt.PenStyle.SolidLine),
             symbol='o',
             symbolBrush=COLOR_ACCENT,
             symbolPen=COLOR_ACCENT,
@@ -245,7 +246,7 @@ class TrendsScreen(QWidget):
             line = pg.InfiniteLine(
                 pos=value,
                 angle=0,
-                pen=pg.mkPen(color=zone_colors[zone], width=1, style=Qt.DashLine)
+                pen=pg.mkPen(color=zone_colors[zone], width=1, style=Qt.PenStyle.DashLine)
             )
             line.setVisible(False)
             self.plot_widget.addItem(line)
@@ -277,7 +278,7 @@ class TrendsScreen(QWidget):
 
     def _load_turbines(self):
         """Загрузить список турбин из репозитория."""
-        if not settings.use_database:
+        if not settings.use_database or self.repository is None:
             return
 
         self.turbine_combo.clear()
@@ -315,11 +316,11 @@ class TrendsScreen(QWidget):
 
     def _on_avg_park_changed(self, state):
         """При переключении 'Среднее по ветропарку'."""
-        self.turbine_combo.setEnabled(state != Qt.Checked)
+        self.turbine_combo.setEnabled(state != Qt.CheckState.Checked)
 
     def _build_trend(self):
         """Построить график трендов."""
-        if not settings.use_database:
+        if not settings.use_database or self.repository is None:
             show_info(self, "Информация", "Тренды доступны только в режиме PostgreSQL.")
             return
 

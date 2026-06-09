@@ -37,7 +37,7 @@ class RawDataCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(400, 250)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet(f"background-color: {COLOR_BG_DARK}; border: 1px solid {COLOR_BORDER}; border-radius: 4px;")
         self.setCursor(Qt.CrossCursor)
         
@@ -150,13 +150,13 @@ class RawDataCanvas(QWidget):
         """Отрисовка графика."""
         try:
             painter = QPainter(self)
-            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             painter.fillRect(self.rect(), QColor(COLOR_BG_DARK))
 
             if len(self.time_data) == 0 or len(self.signal_data) == 0:
                 painter.setPen(QColor(COLOR_TEXT_PRIMARY))
-                painter.setFont(QFont(FONT_FAMILY_MONO, 12, QFont.Bold))
-                painter.drawText(self.rect(), Qt.AlignCenter, f'Нет данных\nдля датчика {self.sensor_id}')
+                painter.setFont(QFont(FONT_FAMILY_MONO, 12, QFont.Weight.Bold))
+                painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Нет данных\nдля датчика {self.sensor_id}')
                 return
 
             # Децимация для производительности
@@ -220,13 +220,13 @@ class RawDataCanvas(QWidget):
 
             # Курсор
             if self.show_cursor and m <= self.cursor_x <= w - m and m <= self.cursor_y <= h - m:
-                painter.setPen(QPen(QColor("#FF6B6B"), 1, Qt.DashLine))
+                painter.setPen(QPen(QColor("#FF6B6B"), 1, Qt.PenStyle.DashLine))
                 painter.drawLine(self.cursor_x, m, self.cursor_x, h - m)
                 painter.drawLine(m, self.cursor_y, w - m, self.cursor_y)
 
             # Заголовок
             painter.setPen(QColor(COLOR_TEXT_PRIMARY))
-            painter.setFont(QFont(FONT_FAMILY_MONO, 10, QFont.Bold))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 10, QFont.Weight.Bold))
             painter.drawText(m, 20, f'Датчик {self.sensor_id} — {self.sensor_name}')
 
             # Подписи осей
@@ -242,11 +242,11 @@ class RawDataCanvas(QWidget):
             painter = QPainter(self)
             painter.setPen(QColor(COLOR_TEXT_PRIMARY))
             painter.setFont(QFont(FONT_FAMILY_MONO, 10))
-            painter.drawText(self.rect(), Qt.AlignCenter, f'Ошибка отрисовки:\n{str(e)}')
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Ошибка отрисовки:\n{str(e)}')
 
 
 class SensorSelector(QFrame):
-    """Панель выбора датчика с 8 кнопками."""
+    """Панель выбора датчика с 8 кнопками (разделены на группы)."""
     
     sensor_selected = Signal(int)  # Сигнал выбора датчика
     
@@ -261,21 +261,28 @@ class SensorSelector(QFrame):
         """)
         self.selected_sensor = 1
         
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 6, 8, 6)
+        main_layout.setSpacing(4)
+        
+        # Группа 1: Редуктор (датчики 1-5)
+        gearbox_layout = QHBoxLayout()
+        gearbox_layout.setSpacing(4)
+        gearbox_label = QLabel('Редуктор:')
+        gearbox_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 9px; font-weight: bold;")
+        gearbox_layout.addWidget(gearbox_label)
         
         self.buttons = {}
-        for sensor_id in range(1, 9):
+        for sensor_id in range(1, 6):
             btn = QPushButton(str(sensor_id))
-            btn.setFixedSize(36, 36)
+            btn.setFixedSize(32, 32)
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLOR_BG_SECONDARY};
                     color: {COLOR_TEXT_SECONDARY};
                     border: 1px solid {COLOR_BORDER};
                     border-radius: 4px;
-                    font-size: 14px;
+                    font-size: 13px;
                     font-weight: bold;
                 }}
                 QPushButton:hover {{
@@ -290,8 +297,46 @@ class SensorSelector(QFrame):
             """)
             btn.setCheckable(True)
             btn.clicked.connect(lambda checked, sid=sensor_id: self._on_sensor_clicked(sid))
-            layout.addWidget(btn)
+            gearbox_layout.addWidget(btn)
             self.buttons[sensor_id] = btn
+        
+        main_layout.addLayout(gearbox_layout)
+        
+        # Группа 2: Генератор (датчики 6-8)
+        generator_layout = QHBoxLayout()
+        generator_layout.setSpacing(4)
+        generator_label = QLabel('Генератор:')
+        generator_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 9px; font-weight: bold;")
+        generator_layout.addWidget(generator_label)
+        
+        for sensor_id in range(6, 9):
+            btn = QPushButton(str(sensor_id))
+            btn.setFixedSize(32, 32)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLOR_BG_SECONDARY};
+                    color: {COLOR_TEXT_SECONDARY};
+                    border: 1px solid {COLOR_BORDER};
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLOR_BG_TERTIARY};
+                    color: {COLOR_TEXT_PRIMARY};
+                }}
+                QPushButton:checked {{
+                    background-color: {COLOR_ACCENT};
+                    color: {COLOR_BG_PRIMARY};
+                    border: 1px solid {COLOR_ACCENT};
+                }}
+            """)
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked, sid=sensor_id: self._on_sensor_clicked(sid))
+            generator_layout.addWidget(btn)
+            self.buttons[sensor_id] = btn
+        
+        main_layout.addLayout(generator_layout)
         
         # Выделяем первый датчик
         self.buttons[1].setChecked(True)
@@ -350,7 +395,7 @@ class RawDataScreen(QWidget):
 
         # Холст с графиком
         self.canvas = RawDataCanvas(self)
-        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.canvas, stretch=1)
 
         # Слайдер масштабирования
@@ -359,7 +404,7 @@ class RawDataScreen(QWidget):
         zoom_label.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 11px;")
         zoom_layout.addWidget(zoom_label)
         
-        self.zoom_slider = QSlider(Qt.Horizontal)
+        self.zoom_slider = QSlider(Qt.Orientation.Horizontal)
         self.zoom_slider.setMinimum(1)
         self.zoom_slider.setMaximum(100)
         self.zoom_slider.setValue(10)

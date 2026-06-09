@@ -5,7 +5,6 @@
 
 import tempfile
 from pathlib import Path
-from typing import Union, List
 from PySide6.QtCore import QThread, Signal
 
 from ..dal.logger import get_logger
@@ -20,7 +19,7 @@ class PDFReportWorker(QThread):
     progress = Signal(int, str)  # процент, сообщение
     finished = Signal(bool, str)  # успех, сообщение
 
-    def __init__(self, parser, sensor_id: int, file_path: Union[str, Path], parent=None):
+    def __init__(self, parser, sensor_id: int, file_path: Path, parent=None):
         """
         Инициализация потока.
 
@@ -33,7 +32,7 @@ class PDFReportWorker(QThread):
         self.parser = parser
         self.sensor_id = sensor_id
         self.file_path = Path(file_path)
-        self._temp_images: List[str] = []
+        self._temp_images = []
 
     def run(self):
         """Выполнить генерацию PDF."""
@@ -64,22 +63,11 @@ class PDFReportWorker(QThread):
             self.finished.emit(False, f"Ошибка: {str(e)}")
 
     def _generate_chart_images(self) -> dict:
-        """Сгенерировать временные PNG-изображения графиков с поддержкой кириллицы."""
+        """Сгенерировать временные PNG-изображения графиков."""
         import numpy as np
         from ..utils.vibration_analysis import VibrationAnalyzer
 
-        # === НАСТРОЙКА КИРИЛЛИЦЫ ДЛЯ MATPLOTLIB ===
-        import matplotlib  # type: ignore[import-not-found]
-        matplotlib.use('Agg')
-        
-        # Настройка шрифтов для поддержки кириллицы
-        # Используем Arial - стандартный шрифт Windows с поддержкой кириллицы
-        matplotlib.rcParams['font.family'] = 'Arial'
-        matplotlib.rcParams['axes.unicode_minus'] = False  # Для корректного отображения минуса
-        
-        import matplotlib.pyplot as plt  # type: ignore[import-not-found]
-
-        chart_images: dict = {}
+        chart_images = {}
         data = self.parser.get_sensor_data(self.sensor_id)
         if data is None:
             return chart_images
@@ -90,6 +78,10 @@ class PDFReportWorker(QThread):
         if data.get('acceleration') is not None and data.get('acceleration_time') is not None:
             self.progress.emit(20, "Создание графика временного ряда...")
             try:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+
                 fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
                 ax.plot(data['acceleration_time'], data['acceleration'], color='black', linewidth=0.8)
                 ax.set_xlabel('Время, с', fontsize=10)
@@ -97,7 +89,7 @@ class PDFReportWorker(QThread):
                 ax.set_title(f'Датчик {self.sensor_id} — НЧ (0.1–10 Гц)', fontsize=11)
                 ax.grid(True, alpha=0.3)
                 ax.set_facecolor('white')
-                fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
+                fig.patch.set_facecolor('white')
 
                 temp_path = tempfile.mktemp(suffix='.png')
                 fig.savefig(temp_path, bbox_inches='tight', dpi=100)
@@ -111,6 +103,10 @@ class PDFReportWorker(QThread):
         if data.get('acceleration') is not None and data.get('acceleration_fs'):
             self.progress.emit(35, "Создание спектра...")
             try:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+
                 acc = np.array(data['acceleration'])
                 fs = data['acceleration_fs']
                 freqs, amps = analyzer.calculate_spectrum(acc, fs)
@@ -123,7 +119,7 @@ class PDFReportWorker(QThread):
                 ax.set_title(f'Датчик {self.sensor_id} — Спектр НЧ', fontsize=11)
                 ax.grid(True, alpha=0.3)
                 ax.set_facecolor('white')
-                fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
+                fig.patch.set_facecolor('white')
 
                 temp_path = tempfile.mktemp(suffix='.png')
                 fig.savefig(temp_path, bbox_inches='tight', dpi=100)
@@ -137,6 +133,10 @@ class PDFReportWorker(QThread):
         if data.get('velocity') is not None and data.get('velocity_fs'):
             self.progress.emit(45, "Создание спектра ВЧ...")
             try:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+
                 vel = np.array(data['velocity'])
                 fs = data['velocity_fs']
                 freqs, amps = analyzer.calculate_spectrum(vel, fs)
@@ -149,7 +149,7 @@ class PDFReportWorker(QThread):
                 ax.set_title(f'Датчик {self.sensor_id} — Спектр ВЧ', fontsize=11)
                 ax.grid(True, alpha=0.3)
                 ax.set_facecolor('white')
-                fig.patch.set_facecolor('white')  # type: ignore[attr-defined]
+                fig.patch.set_facecolor('white')
 
                 temp_path = tempfile.mktemp(suffix='.png')
                 fig.savefig(temp_path, bbox_inches='tight', dpi=100)

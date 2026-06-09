@@ -1,12 +1,14 @@
 """Графики спектрального анализа с пороговыми линиями зон ISO 10816."""
 
 import pyqtgraph as pg
-from pyqtgraph import InfiniteLine, TextItem, ScatterPlotItem
+from pyqtgraph import ScatterPlotItem, TextItem
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-from PySide6.QtGui import QColor
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import Qt, QTimer
 import numpy as np
 from typing import List, Optional
+
+from ..peak_marker import PeakPulseDot
 
 
 # Цвета зон ISO 10816
@@ -17,10 +19,14 @@ ZONE_COLORS = {
     'D': '#DD2C00',
 }
 
-# Пороги для ускорения (м/с²) — НЧ 0.1-10 Гц
+# Пороги для ускорения (м/с²) — НЧ 0.1-10 Гц (SG132)
 ACC_THRESHOLDS = {'A': 1.0, 'B': 2.5, 'C': 5.0}
-# Пороги для скорости (мм/с) — ВЧ 10-1000 Гц
-VEL_THRESHOLDS = {'A': 2.3, 'B': 4.5, 'C': 11.2}
+
+# Пороги для скорости (мм/с) — ВЧ 10-1000 Гц (SG132)
+# Базовый уровень (Норма): 1.5 - 3.5 мм/с
+# Уставка предупреждения (Внимание): ~4.5-5.0 мм/с
+# Уставка авария (Авария): 7.0-10.0 мм/с
+VEL_THRESHOLDS = {'A': 3.5, 'B': 5.0, 'C': 7.5}
 
 
 class SpectrumChart(QWidget):
@@ -32,7 +38,7 @@ class SpectrumChart(QWidget):
         x_label: str = "Частота (Гц)",
         y_label: str = "Амплитуда",
         freq_range: tuple = (0, 1000),
-        thresholds: dict = None,
+        thresholds: dict | None = None,
         highlight_peaks: bool = True,
         parent=None
     ):
@@ -45,7 +51,7 @@ class SpectrumChart(QWidget):
         self.highlight_peaks = highlight_peaks
         self._zone_items = []
         self._threshold_lines = []
-        self._peak_markers: List[ScatterPlotItem] = []
+        self._peak_markers: List[pg.InfiniteLine] = []
         self._peak_text_items: List[TextItem] = []
         self.setup_ui()
 
@@ -151,7 +157,7 @@ class SpectrumChart(QWidget):
                 line = pg.InfiniteLine(
                     pos=value,
                     angle=0,
-                    pen=pg.mkPen(color=color, width=1, style=Qt.DashLine)
+                    pen=pg.mkPen(color=color, width=1, style=Qt.PenStyle.DashLine)
                 )
                 self.plot_widget.addItem(line)
                 self._threshold_lines.append(line)
@@ -163,9 +169,9 @@ class SpectrumChart(QWidget):
         self,
         freq_data: np.ndarray,
         amplitude_data: np.ndarray,
-        peak_range: tuple = None,
-        peak_frequencies: Optional[List[float]] = None,
-        peak_numbers: Optional[List[int]] = None
+        peak_range: tuple | None = None,
+        peak_frequencies: list | None = None,
+        peak_numbers: list | None = None
     ) -> None:
         """
         Установить данные для спектра.
@@ -197,36 +203,18 @@ class SpectrumChart(QWidget):
             # Отображаем пики с нумерацией
             if peak_frequencies and len(peak_frequencies) > 0:
                 self._add_peak_markers(freq_filtered, amplitude_filtered, peak_frequencies, peak_numbers)
-
-        # Подсветка пиков (старый метод)
-        if self.highlight_peaks and peak_range:
-            self._add_peak_highlight(peak_range)
-
-    def _add_peak_highlight(self, peak_range: tuple) -> None:
-        """Добавить полупрозрачную подсветку области пиков."""
-        if self.highlight_item:
-            self.plot_widget.removeItem(self.highlight_item)
-
-        min_freq, max_freq = peak_range
-        view_range = self.plot_widget.viewRange()
-        y_max = view_range[1][1] if view_range else 1.0
-
-        self.highlight_item = pg.LinearRegionItem(
-            values=[min_freq, max_freq],
-            brush=QColor(0, 200, 83, 30),
-            movable=False
-        )
-        self.plot_widget.addItem(self.highlight_item)
+        else:
+            self.plot_widget.setYRange(0, 1)
 
     def _add_peak_markers(
         self,
         freq_data: np.ndarray,
         amplitude_data: np.ndarray,
-        peak_frequencies: List[float],
-        peak_numbers: Optional[List[int]] = None
+        peak_frequencies: list,
+        peak_numbers: list | None = None
     ) -> None:
         """
-        Добавить жёлтые маркеры пиков на график.
+        Добавить жёлтые пунктирные линии пиков на график.
 
         Args:
             freq_data: Массив частот (уже отфильтрованный по диапазону графика).
@@ -265,57 +253,125 @@ class SpectrumChart(QWidget):
             # Получаем номер пика из таблицы
             peak_number = peak_numbers[i] if i < len(peak_numbers) else (i + 1)
 
-            # Создаём ScatterPlotItem для позиции на графике
-            marker_scatter = ScatterPlotItem(
-                x=[peak_freq],
-                y=[peak_amp],
-                size=10,  # Размер точки
-                pen=pg.mkPen(color='#FFD600', width=2),  # Жёлтая обводка
-                brush=pg.mkBrush(color='#FFD600'),  # Жёлтая заливка
-                symbol='o',
-                zValue=100
+            # Создаём вертикальную пунктирную линию
+            vline = pg.InfiniteLine(
+                pos=peak_freq,
+                angle=90,  # Вертикальная линия
+                pen=pg.mkPen(color='#FFD600', width=1, style=Qt.PenStyle.DashLine)
             )
             
             # Добавляем tooltip
             tooltip_text = f'Пик #{peak_number}\nЧастота: {peak_freq:.2f} Гц\nАмплитуда: {peak_amp:.6f}'
-            marker_scatter.setToolTip(tooltip_text)
+            vline.setToolTip(tooltip_text)
             
             # Добавляем на график
-            self.plot_widget.addItem(marker_scatter)
-            self._peak_markers.append(marker_scatter)
-            
-            # Добавляем текстовую метку с номером пика
+            self.plot_widget.addItem(vline)
+            self._peak_markers.append(vline)
+
+            # Добавляем текстовую метку с номером пика и частотой
             text = TextItem(
-                text=f'#{peak_number}',
+                text=f'#{peak_number}\n{peak_freq:.1f} Гц',
                 color='#FFD600',
                 fill='#000000',
-                anchor=(0.5, 0),
-                size=10
+                anchor=(0.5, 0)
             )
+            text.setFont(QFont("Arial", 8))
             text.setPos(peak_freq, peak_amp)
             self.plot_widget.addItem(text)
             self._peak_text_items.append(text)
 
     def _clear_peak_markers(self) -> None:
-        """Очистить маркеры пиков."""
-        for item in self._peak_markers:
+        """Удалить все маркеры пиков."""
+        for marker in self._peak_markers:
             try:
-                self.plot_widget.removeItem(item)
+                self.plot_widget.removeItem(marker)
             except Exception:
                 pass
         self._peak_markers.clear()
 
-        for item in self._peak_text_items:
+        for text in self._peak_text_items:
             try:
-                self.plot_widget.removeItem(item)
+                self.plot_widget.removeItem(text)
             except Exception:
                 pass
         self._peak_text_items.clear()
 
+    def clear_peak_markers(self) -> None:
+        """Публичный метод для очистки маркеров пиков."""
+        self._clear_peak_markers()
+
+    def show_single_peak(self, peak_freq: float, peak_number: int, freq_data: np.ndarray = None, amplitude_data: np.ndarray = None) -> None:
+        """
+        Показать вертикальную линию для одного пика.
+
+        Args:
+            peak_freq: Частота пика (Гц).
+            peak_number: Номер пика для отображения.
+            freq_data: Массив частот (опционально, для определения амплитуды).
+            amplitude_data: Массив амплитуд (опционально).
+        """
+        print(f"[DEBUG] show_single_peak: freq={peak_freq}, num={peak_number}, freq_data={freq_data is not None}, amp_data={amplitude_data is not None}")
+        
+        # Очищаем старые маркеры
+        self._clear_peak_markers()
+
+        # Получаем максимальную частоту в данных
+        if freq_data is not None and len(freq_data) > 0:
+            max_data_freq = np.max(freq_data)
+            min_data_freq = np.min(freq_data)
+            
+            # ПРОВЕРКА: Пик должен быть в диапазоне данных графика (с запасом 10%)
+            max_allowed = max_data_freq * 1.1
+            
+            if peak_freq < min_data_freq * 0.9 or peak_freq > max_allowed:
+                print(f"[DEBUG] Pik {peak_freq} Hz vne diapazona (max={max_data_freq:.2f}, allowed={max_allowed:.0f})!")
+                return  # Pik vne diapazona
+        else:
+            print(f"[DEBUG] freq_data empty or None")
+
+        # Создаём вертикальную пунктирную линию
+        vline = pg.InfiniteLine(
+            pos=peak_freq,
+            angle=90,  # Вертикальная линия
+            pen=pg.mkPen(color='#FFD600', width=1, style=Qt.PenStyle.DashLine)
+        )
+        
+        # Добавляем tooltip
+        tooltip_text = f'Пик #{peak_number}\nЧастота: {peak_freq:.2f} Гц'
+        vline.setToolTip(tooltip_text)
+        
+        # Добавляем на график
+        self.plot_widget.addItem(vline)
+        self._peak_markers.append(vline)
+        print(f"[DEBUG] Liniya dobavlena na grafik")
+
+        # Дабавляем текстовую метку с номером пика и частотой
+        text = TextItem(
+            text=f'#{peak_number}\n{peak_freq:.1f} Гц',
+            color='#FFD600',
+            fill='#000000',
+            anchor=(0.5, 0)
+        )
+        text.setFont(QFont("Arial", 8))
+        
+        # Позиционируем текст на верхней границе графика
+        if amplitude_data is not None and len(amplitude_data) > 0:
+            peak_amp = np.max(amplitude_data) * 0.95  # 95% от максимума
+        else:
+            # Получаем текущий диапазон Y
+            y_range = self.plot_widget.getAxis('left').range
+            peak_amp = y_range[1] * 0.95 if len(y_range) > 1 else 1.0
+        
+        print(f"[DEBUG] Text position: ({peak_freq}, {peak_amp:.4f})")
+        text.setPos(peak_freq, peak_amp)
+        self.plot_widget.addItem(text)
+        self._peak_text_items.append(text)
+        print(f"[DEBUG] Text dobavlen na grafik")
+
     def clear(self) -> None:
         """Очистить график."""
         self.curve.clear()
-        if self.highlight_item:
+        if hasattr(self, 'highlight_item') and self.highlight_item:
             self.plot_widget.removeItem(self.highlight_item)
             self.highlight_item = None
         for item in self._zone_items:
@@ -324,7 +380,8 @@ class SpectrumChart(QWidget):
         for line in self._threshold_lines:
             self.plot_widget.removeItem(line)
         self._threshold_lines.clear()
-        self._clear_peak_markers()  # Очищаем маркеры пиков
+        # Очистка маркеров пиков
+        self._clear_peak_markers()
         self.plot_widget.setYRange(0, 1)
 
     def clear_data(self) -> None:
