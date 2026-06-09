@@ -1,4 +1,4 @@
-"""Точка входа в приложение KWF Prometheus v1.4.1
+"""Точка входа в приложение KWF Prometheus v1.4.3
 
 С поддержкой DAL (Data Access Layer) и PostgreSQL.
 """
@@ -24,7 +24,7 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # Принудительно используем Fusion стиль для консистентности
     app.setApplicationName('KWF Prometheus')
-    app.setApplicationVersion('1.4.1')
+    app.setApplicationVersion('1.4.3')
     app.setOrganizationName('KWF')
     
     # Применение стилей (закомментировано для отладки)

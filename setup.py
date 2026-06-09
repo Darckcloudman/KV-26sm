@@ -1,4 +1,4 @@
-﻿"""Setup для сборки KWF Prometheus v1.4.1 через cx_Freeze"""
+﻿"""Setup для сборки KWF Prometheus v1.4.3 через cx_Freeze"""
 
 from cx_Freeze import setup, Executable
 import sys
@@ -48,7 +48,7 @@ executables = [
 
 setup(
     name="KWF_Prometheus",
-    version="1.4.1",
+    version="1.4.3",
     description="Анализатор вибрационной диагностики ветротурбин KWF Prometheus",
     author="NLP-Core-Team",
     options={"build_exe": build_exe_options},
