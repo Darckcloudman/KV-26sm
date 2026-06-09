@@ -6,10 +6,11 @@
 D:\Coding\pyton_pro\run_app.bat
 
 Что делает:
-1. Автоматически очищает кэш Python (__pycache__)
-2. Проверяет версию приложения (1.4.3)
-3. Запускает актуальную версию
-4. Показывает ошибки при возникновении
+1. Автоматически синхронизирует версии между директориями
+2. Очищает кэш Python (__pycache__)
+3. Проверяет версию приложения (1.4.3)
+4. Запускает актуальную версию
+5. Показывает ошибки при возникновении
 
 ### Вариант 2: Ручной запуск
 cd D:\Coding\pyton_pro\app
@@ -17,6 +18,10 @@ python -m kwf_prometheus.main
 
 ### Вариант 3: Ручная очистка кэша + запуск
 D:\Coding\pyton_pro\app\scripts\clean_cache.bat
+python -m kwf_prometheus.main
+
+### Вариант 4: Ручная синхронизация версий
+D:\Coding\pyton_pro\app\scripts\sync_versions.bat
 python -m kwf_prometheus.main
 
 ---
