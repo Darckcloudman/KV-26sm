@@ -422,24 +422,29 @@ class UploadInfoScreen(QWidget):
         self._load_spectrum_data()
     
     def _load_spectrum_data(self):
+        logger.info("Загрузка спектра для %s, датчик %d", self._turbine_name, self._current_sensor)
         if not settings.use_database or not self.repository:
+            logger.warning("БД не подключена или репозиторий отсутствует")
             self.spectrum_chart.show_no_data(self._current_sensor)
             return
         if self._spectrum_worker and self._spectrum_worker.isRunning():
             self._spectrum_worker.terminate()
         end_date = datetime.now()
         start_date = end_date - timedelta(days=120)
+        logger.info("Запрос спектра: %s - %s", start_date, end_date)
         self._spectrum_worker = SpectrumDataWorker(self.repository, self._turbine_name, self._current_sensor, months=4, parent=self)
         self._spectrum_worker.data_ready.connect(self._on_spectrum_loaded)
         self._spectrum_worker.error.connect(self._on_spectrum_error)
         self._spectrum_worker.start()
     
     def _on_spectrum_loaded(self, data_points):
+        logger.info("Получено %d точек спектра для датчика %d", len(data_points), self._current_sensor)
         self._spectrum_data = data_points
         sensor_name = SENSOR_DESCRIPTIONS.get(self._current_sensor, f"Датчик {self._current_sensor}")
         self.spectrum_chart.set_data(data_points, self._current_sensor, sensor_name)
     
     def _on_spectrum_error(self, error_msg: str):
+        logger.error("Ошибка загрузки спектра: %s", error_msg)
         self.spectrum_chart.show_no_data(self._current_sensor)
     
     def set_upload_data(self, turbine_name: str, loaded_sensors, sensor_files = None, generator_speed = "", active_power = "", record_length = "", record_number = "", record_datetime = ""):
@@ -474,6 +479,7 @@ class UploadInfoScreen(QWidget):
         self.sensor_selector.set_all_statuses(statuses)
     
     def _load_statistics(self, wtg_id: str):
+        logger.info("Загрузка статистики для %s", wtg_id)
         if self._statistics_worker and self._statistics_worker.isRunning():
             self._statistics_worker.terminate()
         self._statistics_worker = StatisticsWorker(self.repository, wtg_id, months=4, parent=self)
@@ -482,8 +488,10 @@ class UploadInfoScreen(QWidget):
         self._statistics_worker.start()
     
     def _on_statistics_loaded(self, stats):
+        logger.info("Получена статистика: %s", stats.keys() if stats else "None")
         if stats and 'records_timeline' in stats:
             timeline = stats['records_timeline']
+            logger.info("Timeline записей: %d дней", len(timeline))
             self._records_by_date = {}
             for date_str, count in timeline.items():
                 try:
@@ -494,6 +502,7 @@ class UploadInfoScreen(QWidget):
         self._load_spectrum_data()
     
     def _on_statistics_error(self, error_msg: str):
+        logger.error("Ошибка загрузки статистики: %s", error_msg)
         self.records_chart.show_no_data()
         self.spectrum_chart.show_no_data(self._current_sensor)
     

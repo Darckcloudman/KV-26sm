@@ -38,7 +38,7 @@ class SpectrumDataWorker(QThread):
     def run(self):
         """Выполнить асинхронный запрос к БД."""
         try:
-            logger.debug(
+            logger.info(
                 "Загрузка спектра ВЧ(ф) для %s, датчик %s (%s мес.)", 
                 self.wtg_id, self.sensor_id, self.months
             )
@@ -56,6 +56,8 @@ class SpectrumDataWorker(QThread):
                 )
             )
             
+            logger.info("Получено %d точек спектра из БД", len(data_points) if data_points else 0)
+            
             # Преобразуем в формат [(date, freq, amp), ...]
             result = []
             if data_points:
@@ -67,7 +69,7 @@ class SpectrumDataWorker(QThread):
                     if dt and freq is not None and amp is not None:
                         result.append((dt, freq, amp))
             
-            logger.debug("Загружено %s точек спектра", len(result))
+            logger.info("Загружено %s точек спектра (после фильтрации)", len(result))
             self.data_ready.emit(result)
             
         except Exception as e:

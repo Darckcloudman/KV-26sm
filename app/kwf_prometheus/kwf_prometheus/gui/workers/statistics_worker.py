@@ -36,7 +36,7 @@ class StatisticsWorker(QThread):
     def run(self):
         """Выполнить асинхронный запрос к БД."""
         try:
-            logger.debug("Загрузка статистики для %s (%s мес.)", self.wtg_id, self.months)
+            logger.info("Загрузка статистики для %s (%s мес.)", self.wtg_id, self.months)
             
             # Получаем базовую статистику
             result = asyncio.run(
@@ -48,6 +48,7 @@ class StatisticsWorker(QThread):
                 end_date = datetime.now()
                 start_date = end_date - timedelta(days=self.months * 30)
                 
+                logger.info("Запрос timeline: %s - %s", start_date, end_date)
                 timeline = asyncio.run(
                     self.repository.get_records_timeline(
                         self.wtg_id, 
@@ -55,9 +56,12 @@ class StatisticsWorker(QThread):
                         end_date
                     )
                 )
+                logger.info("Получен timeline: %d записей", len(timeline or {}))
                 result['records_timeline'] = timeline or {}
                 result['timeline_start'] = start_date.strftime("%Y-%m-%d")
                 result['timeline_end'] = end_date.strftime("%Y-%m-%d")
+            else:
+                logger.warning("Статистика для %s не найдена", self.wtg_id)
             
             self.statistics_ready.emit(result)
         except Exception as e:

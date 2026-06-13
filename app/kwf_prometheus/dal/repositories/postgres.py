@@ -862,7 +862,7 @@ class PostgresRepository(IVibrationRepository):
     @_with_retry(max_retries=3, delay=1.0)
     async def get_turbine_statistics(self, wtg_id: str) -> Optional[Dict[str, Any]]:
         """Получить статистику по конкретной ВЭУ."""
-        logger.debug("Получение статистики для ВЭУ: %s", wtg_id)
+        logger.info("Получение статистики для ВЭУ: %s", wtg_id)
         
         async with self.db_manager.session_factory() as session:
             # Находим турбину
@@ -1058,7 +1058,7 @@ class PostgresRepository(IVibrationRepository):
         """
         from sqlalchemy import func
         
-        logger.debug(
+        logger.info(
             "Получение timeline для %s: %s - %s", 
             wtg_id, start_date, end_date
         )
@@ -1125,7 +1125,7 @@ class PostgresRepository(IVibrationRepository):
         from sqlalchemy import func
         import numpy as np
         
-        logger.debug(
+        logger.info(
             "Получение ВЧ(ф) спектра: %s, датчик %d, %s - %s", 
             wtg_id, sensor_id, start_date, end_date
         )
