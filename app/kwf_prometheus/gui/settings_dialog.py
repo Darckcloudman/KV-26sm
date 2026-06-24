@@ -1227,9 +1227,6 @@ class SettingsDialog(QDialog):
 
     def _apply_settings(self):
         """Применить настройки (без перезапуска)."""
-        from ..dal.logger import get_logger
-        logger = get_logger(__name__)
-        
         try:
             # Собираем новые настройки
             new_settings = {
@@ -1243,8 +1240,6 @@ class SettingsDialog(QDialog):
                 'archive_storage_path': self.storage_path_input.text(),
                 'log_level': self.log_level_combo.currentText(),
             }
-
-            logger.info("Применение настроек: %s", new_settings)
 
             # Сохраняем в .env файл
             from pathlib import Path
@@ -1261,33 +1256,19 @@ class SettingsDialog(QDialog):
                         if key in new_settings:
                             value = new_settings[key]
                             updated_lines.append(f"{key}={value}\n")
-                            logger.info("Обновлено: %s=%s", key, value)
                             continue
                     updated_lines.append(line)
 
                 with open(env_path, 'w', encoding='utf-8') as f:
                     f.writelines(updated_lines)
 
-                logger.info("Настройки сохранены в .env")
-
             # Перезагружаем настройки
-            from ..dal.config import settings
-            # Обновляем значения в объекте settings напрямую
-            settings.db_host = new_settings['db_host']
-            settings.db_port = new_settings['db_port']
-            settings.db_user = new_settings['db_user']
-            settings.db_name = new_settings['db_name']
-            settings.db_connect_retries = new_settings['db_connect_retries']
-            settings.db_connect_retry_delay = new_settings['db_connect_retry_delay']
-            settings.use_database = new_settings['use_database']
-            
-            logger.info("Объект settings обновлён: use_database=%s", settings.use_database)
+            from ..dal.config import Settings
+            settings.__init__()
 
             # Динамически переключаем репозиторий
             if self.repository_switcher:
-                logger.info("Переключение репозитория на: %s", "PostgreSQL" if settings.use_database else "Файловый")
                 self.repository_switcher.switch_mode(settings.use_database)
-                logger.info("Репозиторий переключён: %s", self.repository_switcher.mode)
 
             # Сигнализируем об изменении
             self.settings_changed.emit()
@@ -1296,7 +1277,6 @@ class SettingsDialog(QDialog):
 
         except Exception as e:
             from .styled_message_box import show_critical
-            logger.error("Ошибка применения настроек: %s", e, exc_info=True)
             show_critical(self, "Ошибка применения", 
                          f"Не удалось применить настройки:\n{str(e)}")
 

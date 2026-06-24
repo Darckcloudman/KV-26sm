@@ -44,9 +44,11 @@ class StatisticsWorker(QThread):
             )
             
             if result:
-                # Добавляем timeline за последние N месяцев
+                # Добавляем timeline за последние N месяцев (минимум 300 дней для тестовых данных)
                 end_date = datetime.now()
-                start_date = end_date - timedelta(days=self.months * 30)
+                # Используем days=months*30, но не меньше 300 дней
+                days_count = max(self.months * 30, 300)
+                start_date = end_date - timedelta(days=days_count)
                 
                 timeline = asyncio.run(
                     self.repository.get_records_timeline(

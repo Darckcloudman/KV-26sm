@@ -176,6 +176,15 @@ class PostgresRepository(IVibrationRepository):
                     metadata.get('record_datetime', '')
                 )
                 
+                # Если дата не найдена в метаданных, извлекаем из имени файла
+                if not record_datetime:
+                    record_datetime = self._parse_datetime_from_filename(archive_path)
+                    if record_datetime:
+                        logger.debug(
+                            "Дата извлечена из имени файла: %s",
+                            record_datetime
+                        )
+                
                 # Получаем метрики турбины
                 metrics = parser.get_turbine_metrics()
                 file_size_kb = archive_path.stat().st_size // 1024
@@ -212,11 +221,14 @@ class PostgresRepository(IVibrationRepository):
                             result['skipped'] += 1
                             continue
                         
+                        # Вычисляем хэш файла для дедупликации
+                        file_hash = self._compute_file_hash(archive_path)
+                        
                         # Создаём запись архива
                         archive = Archive(
                             turbine_id=turbine.id,
                             file_path=str(archive_path),
-                            file_hash="",  # Хэш не используется как основной критерий
+                            file_hash=file_hash,
                             record_datetime=record_datetime,
                             file_size_kb=file_size_kb,
                             power_kw=metrics.get('power_kw', 0.0),
@@ -431,6 +443,37 @@ class PostgresRepository(IVibrationRepository):
                 return datetime.strptime(datetime_str.strip(), fmt)
             except ValueError:
                 continue
+        
+        return None
+    
+    def _parse_datetime_from_filename(self, file_path: Path) -> Optional[datetime]:
+        """
+        Извлечь дату-время из имени файла.
+        
+        Формат имени: SMP_YYYYMMDD_NNNNN_SENSOR_NN_FILTER_W.rd2
+        Пример: SMP_20250901_38408_SENSOR_01_FILTER_W.rd2
+        
+        Args:
+            file_path: Путь к файлу
+            
+        Returns:
+            datetime или None
+        """
+        filename = file_path.name
+        
+        # Ищем паттерн SMP_YYYYMMDD
+        import re
+        match = re.search(r'SMP_(\d{8})_\d+', filename)
+        
+        if match:
+            date_str = match.group(1)
+            try:
+                return datetime.strptime(date_str, "%Y%m%d")
+            except ValueError:
+                logger.warning(
+                    "Не удалось распарсить дату из имени файла: %s",
+                    filename
+                )
         
         return None
     
@@ -1163,7 +1206,7 @@ class PostgresRepository(IVibrationRepository):
             for archive, sensor_data in archives_result.all():
                 if not sensor_data.values or not archive.record_datetime:
                     continue
-                
+            
                 # Вычисляем FFT для получения спектра
                 try:
                     values = np.array(sensor_data.values)

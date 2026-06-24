@@ -44,7 +44,9 @@ class SpectrumDataWorker(QThread):
             )
             
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=self.months * 30)
+            # Используем days=months*30, но не меньше 300 дней для тестовых данных
+            days_count = max(self.months * 30, 300)
+            start_date = end_date - timedelta(days=days_count)
             
             # Получаем спектральные данные
             data_points = asyncio.run(

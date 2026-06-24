@@ -169,25 +169,49 @@ class SensorSelector(QFrame):
 
 
 class Spectrum3DChart(QWidget):
-    """3D спектральный график (дата, Гц, мм/с²)."""
+    """3D спектральный график (каскад спектров по датам)."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(400, 300)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet(f"background-color: {COLOR_BG_DARK}; border: 1px solid {COLOR_BORDER}; border-radius: 4px;")
-        self.data_points = []
+        self.spectrum_data = {}  # {date: [(freq, amp), ...]}
         self.sensor_id = 1
         self.sensor_name = ""
     
-    def set_data(self, data_points: List[tuple], sensor_id: int, sensor_name: str):
-        self.data_points = data_points
+    def set_data(self, data_points: List[dict], sensor_id: int, sensor_name: str):
+        """
+        Установить данные спектра.
+        
+        Args:
+            data_points: Список {'timestamp': datetime, 'frequency': float, 'amplitude': float}
+            sensor_id: Номер датчика
+            sensor_name: Название датчика
+        """
         self.sensor_id = sensor_id
         self.sensor_name = sensor_name
+        
+        # Группируем по датам
+        from collections import defaultdict
+        self.spectrum_data = defaultdict(list)
+        
+        for point in data_points:
+            if point['timestamp'] and point['frequency'] and point['amplitude']:
+                date_key = point['timestamp'].date()
+                self.spectrum_data[date_key].append((
+                    point['frequency'],
+                    point['amplitude']
+                ))
+        
+        # Сортируем частоты внутри каждой даты
+        for date in self.spectrum_data:
+            self.spectrum_data[date].sort(key=lambda x: x[0])
+        
         self.update()
     
     def show_no_data(self, sensor_id: int):
-        self.data_points = []
+        self.spectrum_data = {}
         self.sensor_id = sensor_id
         self.update()
     
@@ -197,57 +221,112 @@ class Spectrum3DChart(QWidget):
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             painter.fillRect(self.rect(), QColor(COLOR_BG_DARK))
             
-            if not self.data_points:
+            if not self.spectrum_data:
                 painter.setPen(QColor(COLOR_TEXT_PRIMARY))
                 painter.setFont(QFont(FONT_FAMILY_MONO, 12, QFont.Weight.Bold))
                 painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f'Нет данных\nдля датчика {self.sensor_id}')
                 return
             
-            dates = [p[0] for p in self.data_points]
-            freqs = [p[1] for p in self.data_points]
-            amps = [p[2] for p in self.data_points]
-            
-            min_date, max_date = min(dates), max(dates)
-            min_freq, max_freq = min(freqs), max(freqs)
-            max_amp = max(amps) * 1.1 if amps else 1.0
-            
-            m_left, m_right, m_top, m_bottom = 60, 20, 20, 50
+            # Параметры отрисовки
+            m_left, m_right, m_top, m_bottom = 70, 30, 30, 50
             w, h = self.width(), self.height()
             plot_w, plot_h = w - m_left - m_right, h - m_top - m_bottom
             
-            if plot_w <= 0 or plot_h <= 0: return
+            if plot_w <= 0 or plot_h <= 0:
+                return
             
-            def date_to_x(dt):
-                total = (max_date - min_date).total_seconds() or 1
-                return m_left + ((dt - min_date).total_seconds() / total) * plot_w
+            # Получаем все даты и сортируем
+            sorted_dates = sorted(self.spectrum_data.keys())
+            num_dates = len(sorted_dates)
             
-            def freq_to_y(f):
-                rng = (max_freq - min_freq) or 1
-                return m_top + plot_h - ((f - min_freq) / rng) * plot_h
+            # Находим общий диапазон частот
+            all_freqs = []
+            all_amps = []
+            for freq, amp in [p for points in self.spectrum_data.values() for p in points]:
+                all_freqs.append(freq)
+                all_amps.append(amp)
             
-            def amp_to_size(a):
-                return max(2, min(10, (a / max_amp) * 10)) if max_amp > 0 else 3
+            if not all_freqs:
+                return
             
-            painter.setPen(QPen(QColor(COLOR_ACCENT), 2))
-            painter.drawLine(m_left, m_top, m_left, m_top + plot_h)
-            painter.drawLine(m_left, m_top + plot_h, m_left + plot_w, m_top + plot_h)
+            min_freq, max_freq = min(all_freqs), max(all_freqs)
+            max_amp = max(all_amps) * 1.1 if all_amps else 1.0
             
-            for dt, freq, amp in self.data_points[:500]:  # Оптимизация
-                x, y = date_to_x(dt), freq_to_y(freq)
-                r = amp_to_size(amp)
-                ratio = amp / max_amp if max_amp > 0 else 0.5
-                color = QColor(int(255 * ratio), int(255 * (1 - ratio)), 0)
+            # Шаг по оси Y для каждого спектра
+            spectrum_spacing = plot_h / (num_dates + 1)
+            
+            # Рисуем оси
+            painter.setPen(QPen(QColor(COLOR_TEXT_TERTIARY), 1))
+            painter.drawLine(m_left, m_top, m_left, m_top + plot_h)  # Y ось
+            painter.drawLine(m_left, m_top + plot_h, m_left + plot_w, m_top + plot_h)  # X ось
+            
+            # Рисуем подписи осей
+            painter.setPen(QColor(COLOR_TEXT_PRIMARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 9, QFont.Weight.Bold))
+            painter.drawText(5, m_top + plot_h // 2, 'Гц')
+            painter.drawText(w // 2, h - 10, 'Частота, Гц')
+            
+            # Подписи частот
+            painter.setPen(QColor(COLOR_TEXT_TERTIARY))
+            painter.setFont(QFont(FONT_FAMILY_MONO, 7))
+            for i in range(5):
+                freq = min_freq + (max_freq - min_freq) * i / 4
+                y = m_top + plot_h - (i / 4) * plot_h
+                painter.drawText(5, int(y + 3), f'{freq:.0f}')
+            
+            # Рисуем каждый спектр
+            colors = [
+                QColor("#FF0000"),  # Красный
+                QColor("#FF7F00"),  # Оранжевый
+                QColor("#FFFF00"),  # Жёлтый
+                QColor("#00FF00"),  # Зелёный
+                QColor("#0000FF"),  # Синий
+                QColor("#4B0082"),  # Индиго
+                QColor("#9400D3"),  # Фиолетовый
+            ]
+            
+            for idx, date in enumerate(sorted_dates):
+                points = self.spectrum_data[date]
+                if not points:
+                    continue
+                
+                # Базовая линия для этого спектра
+                base_y = m_top + plot_h - (idx + 1) * spectrum_spacing
+                
+                # Цвет спектра
+                color = colors[idx % len(colors)]
                 painter.setPen(QPen(color, 1))
-                painter.setBrush(color)
-                painter.drawEllipse(int(x - r/2), int(y - r/2), int(r), int(r))
+                
+                # Рисуем линию спектра
+                first_point = True
+                for freq, amp in points:
+                    # Нормализуем частоту по X
+                    if max_freq > min_freq:
+                        x = m_left + ((freq - min_freq) / (max_freq - min_freq)) * plot_w
+                    else:
+                        x = m_left + plot_w / 2
+                    
+                    # Амплитуда по Y (от базовой линии)
+                    amp_height = (amp / max_amp) * (spectrum_spacing * 0.8)
+                    y = base_y - amp_height
+                    
+                    if first_point:
+                        painter.drawLine(int(x), int(base_y), int(x), int(y))
+                        first_point = False
+                    else:
+                        painter.drawLine(int(x), int(base_y), int(x), int(y))
+                
+                # Подпись даты
+                painter.setPen(QColor(COLOR_TEXT_SECONDARY))
+                painter.setFont(QFont(FONT_FAMILY_MONO, 7))
+                date_str = date.strftime("%d.%m.%Y")
+                painter.drawText(2, int(base_y + 3), date_str)
             
+            # Заголовок
             painter.setPen(QColor(COLOR_TEXT_PRIMARY))
             painter.setFont(QFont(FONT_FAMILY_MONO, 10, QFont.Weight.Bold))
             painter.drawText(m_left, 15, f'Датчик {self.sensor_id} — {self.sensor_name}')
-            painter.setPen(QColor(COLOR_TEXT_TERTIARY))
-            painter.setFont(QFont(FONT_FAMILY_MONO, 8))
-            painter.drawText(w // 2 - 40, h - 10, 'Дата')
-            painter.drawText(5, h // 2, 'Гц')
+            
         except Exception as e:
             painter = QPainter(self)
             painter.setPen(QColor(COLOR_TEXT_PRIMARY))
@@ -421,20 +500,28 @@ class UploadInfoScreen(QWidget):
         self._current_sensor = sensor_id
         self._load_spectrum_data()
     
-    def _load_spectrum_data(self):
+    def _load_spectrum_data(self, months: int = 10):
         if not settings.use_database or not self.repository:
             self.spectrum_chart.show_no_data(self._current_sensor)
             return
         if self._spectrum_worker and self._spectrum_worker.isRunning():
             self._spectrum_worker.terminate()
+        # Используем диапазон 300 дней (~10 месяцев) для охвата тестовых данных
+        # Данные за сентябрь 2025, сейчас июнь 2026 (~290 дней назад)
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=120)
-        self._spectrum_worker = SpectrumDataWorker(self.repository, self._turbine_name, self._current_sensor, months=4, parent=self)
+        start_date = end_date - timedelta(days=300)
+        self._spectrum_worker = SpectrumDataWorker(self.repository, self._turbine_name, self._current_sensor, months=months, parent=self)
         self._spectrum_worker.data_ready.connect(self._on_spectrum_loaded)
         self._spectrum_worker.error.connect(self._on_spectrum_error)
         self._spectrum_worker.start()
     
     def _on_spectrum_loaded(self, data_points):
+        """
+        Обработать данные спектра.
+        
+        Args:
+            data_points: Список dict {'timestamp': datetime, 'frequency': float, 'amplitude': float}
+        """
         self._spectrum_data = data_points
         sensor_name = SENSOR_DESCRIPTIONS.get(self._current_sensor, f"Датчик {self._current_sensor}")
         self.spectrum_chart.set_data(data_points, self._current_sensor, sensor_name)
@@ -460,7 +547,8 @@ class UploadInfoScreen(QWidget):
         self.btn_process.setEnabled(len(loaded_sensors) > 0)
         
         if settings.use_database and self.repository:
-            self._load_statistics(turbine_name)
+            # Используем 14 месяцев для охвата тестовых данных (сентябрь 2025 - январь 2026)
+            self._load_statistics(turbine_name, months=14)
     
     def _update_sensor_statuses(self):
         statuses = {}
@@ -473,10 +561,12 @@ class UploadInfoScreen(QWidget):
                 statuses[sensor_id] = SensorSelector.STATUS_COMPLETE if has_all else SensorSelector.STATUS_PARTIAL
         self.sensor_selector.set_all_statuses(statuses)
     
-    def _load_statistics(self, wtg_id: str):
+    def _load_statistics(self, wtg_id: str, months: int = 14):
         if self._statistics_worker and self._statistics_worker.isRunning():
             self._statistics_worker.terminate()
-        self._statistics_worker = StatisticsWorker(self.repository, wtg_id, months=4, parent=self)
+        # Используем 10 месяцев (300 дней) для охвата тестовых данных
+        # Данные за сентябрь 2025, сейчас июнь 2026 (~290 дней назад)
+        self._statistics_worker = StatisticsWorker(self.repository, wtg_id, months=10, parent=self)
         self._statistics_worker.statistics_ready.connect(self._on_statistics_loaded)
         self._statistics_worker.error.connect(self._on_statistics_error)
         self._statistics_worker.start()

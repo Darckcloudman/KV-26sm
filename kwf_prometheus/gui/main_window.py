@@ -535,18 +535,27 @@ class MainWindow(QMainWindow):
 
     def _update_mode_indicator(self):
         """Обновить индикатор режима в статус-баре."""
+        if not hasattr(self, 'repository_switcher') or not self.repository_switcher:
+            return
+        
+        # Получаем режим напрямую из switcher
+        mode = self.repository_switcher.mode
         info = self.repository_switcher.get_repository_info()
-        if info['mode'] == 'postgres':
-            text = f"Режим: PostgreSQL ({info.get('host', 'localhost')})"
-            color = "#448AFF"
+        
+        if mode == 'postgres':
+            host = info.get('host', settings.db_host)
+            port = info.get('port', settings.db_port)
+            text = f"Режим: PostgreSQL ({host}:{port})"
+            color = "#448AFF"  # Синий
         else:
             text = "Режим: Файловая система"
-            color = "#888888"
+            color = "#888888"  # Серый
         
-        self.mode_indicator.setText(text)
-        self.mode_indicator.setStyleSheet(
-            f"color: {color}; font-size: 10px; padding: 0px 8px;"
-        )
+        if hasattr(self, 'mode_indicator'):
+            self.mode_indicator.setText(text)
+            self.mode_indicator.setStyleSheet(
+                f"color: {color}; font-size: 10px; padding: 0px 8px;"
+            )
 
     def _open_settings(self):
         """Открыть диалог настроек."""
@@ -565,14 +574,14 @@ class MainWindow(QMainWindow):
             self.repository = self.repository_switcher.switch_mode(settings.use_database)
             logger.info(f"Репозиторий переключён: {self.repository_switcher.mode}")
             
-            # Обновляем все экраны с новым репозиторием
+            # СНАЧАЛА обновляем все экраны с новым репозиторием
             self._update_all_screens()
             
             # Пересоздаём persistence_service если нужно
             if settings.use_database and self.repository_switcher.mode == 'postgres':
                 try:
                     from ..dal.repositories.postgres import PostgresRepository
-                    from ..services.data_persistence import DataPersistenceService
+                    from ..dal.persistence_service import DataPersistenceService
                     
                     if isinstance(self.repository, PostgresRepository):
                         self.persistence_service = DataPersistenceService(self.repository)
@@ -582,12 +591,14 @@ class MainWindow(QMainWindow):
             else:
                 self.persistence_service = None
             
+            # ПОТОМ обновляем индикатор режима (после переключения)
             self._update_mode_indicator()
+            self._update_status_icon('db' if self.repository_switcher.mode == 'postgres' else 'file')
             
             show_info(
                 self,
                 "Настройки применены",
-                f"Режим изменён на: {'PostgreSQL' if settings.use_database else 'Файловая система'}"
+                f"Режим изменён на: {'PostgreSQL' if self.repository_switcher.mode == 'postgres' else 'Файловая система'}"
             )
         except Exception as e:
             logger.error(f"Ошибка при переключении репозитория: {e}", exc_info=True)
