@@ -79,9 +79,15 @@ class CascadeSpectrumViewer:
     
     def _draw_lines(self):
         colors = {'A': '#2E7D32', 'B': '#F9A825', 'C': '#EF6C00', 'D': '#C62828'}
-        for line in self.lines: line.remove()
-        for pt in self.peak_points: pt.remove()
-        if self.peak_line: self.peak_line.remove()
+        for line in self.lines:
+            try: line.remove()
+            except: pass
+        for pt in self.peak_points:
+            try: pt.remove()
+            except: pass
+        if self.peak_line:
+            try: self.peak_line.remove()
+            except: pass
         self.lines = []
         self.peak_points = []
         self.peak_line = None
@@ -169,6 +175,11 @@ class CascadeSpectrumViewer:
         if self.is_loading: return
         print(f'Sensor: {sid}')
         self.current_sensor = sid
+        # Сброс пиков при смене датчика
+        self.show_peaks = False
+        if self.peaks_btn:
+            self.peaks_btn.color = '#2196F3'
+            self.peaks_btn.label.set_text('Show peaks')
         for i,b in enumerate(self.buttons):
             b.color = '#4CAF50' if i+1==sid else '#E0E0E0'
             b.label.set_color('white' if i+1==sid else 'black')
@@ -192,7 +203,7 @@ class CascadeSpectrumViewer:
             self.fig.canvas.draw_idle()
             self.fig.canvas.flush_events()
     
-    def _get_zone(self, v):
+    def _peaks_click(self, v):
         v = v*10
         return 'A' if v<2.3 else 'B' if v<4.5 else 'C' if v<7.8 else 'D'
 
