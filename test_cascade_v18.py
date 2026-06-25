@@ -85,8 +85,9 @@ class CascadeSpectrumViewer:
         self.lines = []
         self.peak_points = []
         self.peak_line = None
-        dates_sorted = sorted(self.spectra_data.keys())
+        dates_sorted = sorted(self.spectra_data.keys(), key=lambda d: datetime.strptime(d, '%d.%m.%Y'))
         peak_freqs, peak_amps, peak_ys = [], [], []
+        ref_freq = None  # Опорная частота первого пика
         for i, date in enumerate(dates_sorted):
             pts = self.spectra_data[date]
             freq = np.array([p[0] for p in pts])
@@ -94,7 +95,19 @@ class CascadeSpectrumViewer:
             zone = self._get_zone(np.max(amp))
             line, = self.ax.plot(freq, [i]*len(freq), amp, color=colors[zone], linewidth=1.2, label=f'{date} ({zone})', alpha=0.9)
             self.lines.append(line)
-            max_idx = np.argmax(amp)
+            # Поиск пика в диапазоне ±100Hz от опорного
+            if ref_freq is None:
+                # Первый спектр - глобальный максимум
+                max_idx = np.argmax(amp)
+                ref_freq = freq[max_idx]
+            else:
+                # Остальные - максимум в диапазоне ±100Hz
+                mask = (freq >= ref_freq - 100) & (freq <= ref_freq + 100)
+                if np.any(mask):
+                    max_idx = np.argmax(amp[mask])
+                    max_idx = np.where(mask)[0][max_idx]
+                else:
+                    max_idx = np.argmax(amp)
             peak_freq, peak_amp = freq[max_idx], amp[max_idx]
             peak_ys.append(i); peak_freqs.append(peak_freq); peak_amps.append(peak_amp)
             pt = self.ax.scatter([peak_freq], [i], [peak_amp], color='red', s=20, depthshade=True, zorder=10)
