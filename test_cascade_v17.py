@@ -1,4 +1,5 @@
 ﻿# -*- coding: utf-8 -*-
+import matplotlib; matplotlib.use('TkAgg')
 import sys, random
 from pathlib import Path
 from datetime import datetime
@@ -53,9 +54,9 @@ class CascadeSpectrumViewer:
                 dt = datetime.strptime(date_str, '%Y%m%d')
                 values = res['values']
                 fs = res['metadata'].get('sampling_frequency', 25600)
-                if values:
+                if len(values) > 0:
                     freq, amp = self.analyzer.calculate_spectrum(values, fs)
-                    if len(freq) and len(amp):
+                    if len(freq) > 0 and len(amp) > 0:
                         self.spectra_data[dt.strftime('%d.%m.%Y')] = list(zip(freq, amp))
             except: pass
         self.is_loading = False
@@ -155,7 +156,13 @@ def main():
     viewer = CascadeSpectrumViewer(data_path)
     if viewer.load_spectra(2, 'HIGH'):
         viewer.plot_cascade(f'Sensor 2 (HIGH) - {len(viewer.spectra_data)} records')
+        plt.show()
+        print('Window closed')
     print('\nControls: 1-8 = Sensor, 4/7 = Random dates')
 
 if __name__ == '__main__':
     main()
+
+
+
+
